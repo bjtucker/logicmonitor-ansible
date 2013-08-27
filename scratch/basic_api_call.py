@@ -30,9 +30,6 @@ import shlex
 args_file = sys.argv[1]
 args_data = file(args_file).read()
 
-company = "chimpco"
-user = "ethan"
-password = "ethan"
 
 def rpc(action, params):
     """Make a call to the LogicMonitor RPC library and return the response"""
