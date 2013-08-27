@@ -1,0 +1,64 @@
+#!/usr/bin/python
+
+
+
+import urllib
+import urlparse
+import sys
+import json
+import os
+import shlex
+
+class Logicmonitor(object):
+    def __new__():
+        pass
+    #end __new__
+
+    def __init__(self, module):
+        self.module      = module
+        self.state       = module.params['state']
+        self.name        = module.params['name']
+        self.hostname    = module.params['hostname']
+        self.displayname = module.params['displayname']
+        self.alertenable = module.params['alertenable']
+        
+    #end __init__
+
+    # Generic RPC handler for the LogicMonitor API.
+    # Calls 
+    def rpc(action, params):
+        """Make a call to the LogicMonitor RPC library and return the response"""
+        print "Calling action: %s" % action
+        print "Parameters: %s" % str(params)
+        param_str = urllib.urlencode(params)
+        creds = urllib.urlencode({"c": company, "u": user, "p": password})
+        if param_str:
+            param_str = param_str + "&"
+        #end if
+        param_str = param_str + creds
+        try:
+            f = urllib.urlopen("https://{0}.logicmonitor.com/santaba/rpc/{1}?{2}".format(company, action, param_str))
+            return f.read()
+        except IOError as ioe:
+            print ioe
+        #end try
+    #end rpc
+#end Logicmonitor
+#========================================
+
+def main():
+    """docstring for main"""
+    lm_defaults = {}
+    
+    module = AnsibleModule(
+        argument_spec = dict(
+            #add args here
+        ),
+        supports_check_mode=True
+    )
+
+#end main
+
+# include magic from lib/ansible/module_common.py
+#<<INCLUDE_ANSIBLE_MODULE_COMMON>>
+main()
