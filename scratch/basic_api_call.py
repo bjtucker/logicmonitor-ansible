@@ -30,18 +30,21 @@ import shlex
 args_file = sys.argv[1]
 args_data = file(args_file).read()
 
+lm_credentials_file = open("/tmp/lm_credentials.txt")
+lm_credentials = json.loads(lm_credentials_file.read())
+#print json.dumps(lm_credentials)
 
 def rpc(action, params):
     """Make a call to the LogicMonitor RPC library and return the response"""
     print "Calling action: %s" % action
     print "Parameters: %s" % str(params)
     param_str = urllib.urlencode(params)
-    creds = urllib.urlencode({"c": company, "u": user, "p": password})
+    creds = urllib.urlencode({"c": lm_credentials['company'], "u": lm_credentials['user'], "p": lm_credentials['password']})
     if param_str:
         param_str = param_str + "&"
     param_str = param_str + creds
     try:
-        f = urllib.urlopen("https://{0}.logicmonitor.com/santaba/rpc/{1}?{2}".format(company, action, param_str))
+        f = urllib.urlopen("https://{0}.logicmonitor.com/santaba/rpc/{1}?{2}".format(lm_credentials["company"], action, param_str))
         return f.read()
     except IOError as ioe:
         print ioe
