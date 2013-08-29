@@ -32,7 +32,6 @@ args_data = file(args_file).read()
 
 lm_credentials_file = open("/tmp/lm_credentials.txt")
 lm_credentials = json.loads(lm_credentials_file.read())
-#print json.dumps(lm_credentials)
 
 def rpc(action, params):
     """Make a call to the LogicMonitor RPC library and return the response"""
