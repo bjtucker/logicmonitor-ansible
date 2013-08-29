@@ -15,7 +15,7 @@ import sys
 import json
 import os
 import shlex
-import md5
+import hashlib
 import socket
 
 class LogicMonitor:
@@ -30,7 +30,7 @@ class LogicMonitor:
         if lm_credentials["digest"]:
             self.password_digest = self.password
         else:
-            m = md5.new()
+            m = hashlib.md5()
             m.update(self.password)
             self.password_digest = m.hexdigest()
         #end if lm_credentials
