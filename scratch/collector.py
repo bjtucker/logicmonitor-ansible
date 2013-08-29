@@ -28,10 +28,8 @@ class Collector(LogicMonitor):
         """docstring for %s"""
         LogicMonitor.__init__(self, credentials_file)
         info = self._get()
-        print info
         if info is None:
             info = self._create()
-            print info
         #end if
         self.id     = info["id"]
         self.isdown = info["isDown"]
@@ -75,25 +73,25 @@ class Collector(LogicMonitor):
         if self.is_64bits:
             arch = 64
         #end
-        if self.installertype is "Linux" and self.id is not None:
+        if self.installertype == "Linux" and self.id is not None:
             installfilepath = self.installdir + "/logicmonitorsetup" + str(self.id) + "_" + str(arch) + ".bin"
             print installfilepath
             if not os.path.isfile(installfilepath):             #else create the installer file and return the file object
                 with open(installfilepath, "w") as f:
                     installer = self.do("logicmonitorsetup", {"id": self.id, "arch": arch})
-                    f.write(installer)
+		    f.write(installer)
                 f.closed
                 #end with
             #end if not
             return installfilepath
-        elif self.installertype is "Windows" and self.id is not None:
+        elif self.installertype == "Windows" and self.id is not None:
             pass
         elif self.id is None:
             print "Error: There is currently no collector associated with this device. To download the installer, first create a collector for this device."
             return None
-        # elif self.installertype is not "Linux" and self.installertype is not "Windows":
-        #     print "Error: LogicMonitor Collector must be installed on either a Linux or Windows device."
-        #     return None
+        elif self.installertype != "Linux" and self.installertype != "Windows":
+             print "Error: LogicMonitor Collector must be installed on either a Linux or Windows device."
+             return None
         else:
             print "Error: Something went wrong. We were unable to retrieve the installer from the server"
             return None
@@ -151,7 +149,6 @@ class Collector(LogicMonitor):
         if collector_list is not None:
             for collector in collector_list:
                 if collector["description"] == self.fqdn:
-                    print collector
                     return collector
                 #end if
             #end for
@@ -179,4 +176,3 @@ class Collector(LogicMonitor):
 # testing
 
 c = Collector()
-test = c.getinstallerbin()
