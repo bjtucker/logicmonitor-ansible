@@ -4,59 +4,393 @@
 
 import urllib
 import urlparse
-import sys
 import json
+import sys
 import os
+import platform
+import subprocess
+import hashlib
+import socket
 import shlex
+from subprocess import call
+from subprocess import Popen
 
-class Logicmonitor(object):
-    def __new__():
-        pass
-    #end __new__
+class LogicMonitor(object):
 
-    def __init__(self, module):
-        self.module      = module
-        self.state       = module.params['state']
-        self.name        = module.params['name']
-        self.hostname    = module.params['hostname']
-        self.displayname = module.params['displayname']
-        self.alertenable = module.params['alertenable']
+    def __init__(self, module, **kwargs):
+        self.module                 = module
+        self.company                = kwargs["company"]
+        self.user                   = kwargs["user"]
+        self.password               = kwargs["password"]
+        if 'digest' in kwargs:
+            self.digest             = kwargs['digest']
+        else:
+            self.digest             = False
+        #end 
+        if self.digest:
+            self.password_digest    = self.password
+        else:
+            m = hashlib.md5()
+            m.update(self.password)
+            self.password_digest    = m.hexdigest()
+        #end if lm_credentials
+        self.fqdn           = socket.getfqdn()
+        
         
     #end __init__
 
-    # Generic RPC handler for the LogicMonitor API.
-    # Calls 
-    def rpc(action, params):
+    def rpc(self, action, params):
         """Make a call to the LogicMonitor RPC library and return the response"""
-        print "Calling action: %s" % action
-        print "Parameters: %s" % str(params)
         param_str = urllib.urlencode(params)
-        creds = urllib.urlencode({"c": company, "u": user, "p": password})
+        creds = urllib.urlencode({"c": self.company, "u": self.user, "pmd5": self.password_digest})
         if param_str:
             param_str = param_str + "&"
-        #end if
         param_str = param_str + creds
         try:
-            f = urllib.urlopen("https://{0}.logicmonitor.com/santaba/rpc/{1}?{2}".format(company, action, param_str))
+            f = urllib.urlopen("https://{0}.logicmonitor.com/santaba/rpc/{1}?{2}".format(self.company, action, param_str))
             return f.read()
         except IOError as ioe:
             print ioe
+            sys.exit(1)
+        #end try
+    #end rpc
+
+    def do(self, action, params):
+        """Make a call to the LogicMonitor server \"do\" function"""
+        param_str = urllib.urlencode(params)
+        creds = urllib.urlencode({"c": self.company, "u": self.user, "pmd5": self.password_digest})
+        if param_str:
+            param_str = param_str + "&"
+        param_str = param_str + creds
+        try:
+            f = urllib.urlopen("https://{0}.logicmonitor.com/santaba/do/{1}?{2}".format(self.company, action, param_str))
+            return f.read()
+        except IOError as ioe:
+            print ioe
+            sys.exit(1)
         #end try
     #end rpc
 #end Logicmonitor
+
+class Collector(LogicMonitor):
+    
+    
+    def __init__(self, module):
+        """Initializor for the LogicMonitor Collector object"""
+        LogicMonitor.__init__(self, module, **module.params)
+        info                = self._get()
+        self.installdir     = "/usr/local/logicmonitor"
+        self.change     = False
+        if info is None:
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            else:
+                info        = self._create()
+                if not os.path.exists(self.installdir):
+                    os.makedir(installdir)
+                 #end if
+            #end if
+        #end if
+        self.id             = info["id"]
+        self.isdown         = info["isDown"]
+        self.platform       = platform.system()
+        self.is_64bits      = sys.maxsize > 2**32
+    #end __init__
+        
+    ####################################
+    #                                  #
+    #    Public methods                #
+    #                                  #
+    ####################################
+    
+    def create(self):
+        """idempotent function to make sure that there is a running collector installed and registered in your LogicMonitor Account"""
+        self._create()
+        self.getinstallerbin()
+        self.install()
+        self.start()
+    #end create
+
+    def destroy(self):
+        """idempotent function to make sure that there is a running collector installed and registered in your LogicMonitor Account"""
+        self.stop()
+        self.uninstall()
+        self._delete()
+    #end create
+    
+    
+    def getid(self):
+        """Accessor method to get the id number of the LogicMonitor Collector"""
+        return self.id
+    #end get_collector
+
+    def getinstalldir(self):
+        """Return path of the directory for installation of the LogicMonitor collector"""
+        return self.installdir
+    #end getinstalldir
+    
+    def setinstalldir(self, newinstalldir):
+        """Verifies that the directory specified exists.
+        sets as the LogicMonitor collector installation location"""
+        if not os.path.exists(newinstalldir):
+            os.makedirs(newinstalldir)
+        #end if
+        self.installdir = newinstalldir
+    #end setinstalldir
+
+    def getinstallerbin(self):
+        """Download the LogicMonitor collector installer binary"""
+        arch = 32
+        if self.is_64bits:
+            arch = 64
+        #end
+        if self.platform == "Linux" and self.id is not None:
+            installfilepath = self.installdir + "/logicmonitorsetup" + str(self.id) + "_" + str(arch) + ".bin"
+            if not os.path.isfile(installfilepath):             #create the installer file and return the file object
+                self.change = True #set change flag to show that something was update
+                if self.module.check_mode:
+                    self.module.exit_json(changed=True)
+                #end if
+                with open(installfilepath, "w") as f:
+                    installer = self.do("logicmonitorsetup", {"id": self.id, "arch": arch})
+                    f.write(installer)
+                f.closed
+                #end with
+            #end if not
+            return installfilepath
+        elif self.id is None:
+            self.module.fail_json(msg="Error: There is currently no collector associated with this device. To download the installer, first create a collector for this device.")
+        elif self.platform != "Linux":
+            self.module.fail_json(msg="Error: LogicMonitor Collector must be installed on a Linux device.")
+        else:
+            self.module.fail_json(msg="Error: Something went wrong. We were unable to retrieve the installer from the server")
+        #end if
+    #end getinstallerbin
+    
+    def install(self):
+        """Execute the LogicMonitor installer if not already installed"""
+        if self.platform == "Linux":
+            installer = self.getinstallerbin()
+            if not os.path.exists(self.installdir + "/agent") or (self._get()["platform"] != 'linux'):
+                self.change = True #set change flag to show that something was update
+                if self.module.check_mode:
+                    self.module.exit_json(changed=True)
+                #end if
+                os.chmod(installer, 755)
+                output = call([installer, "-y"])
+                if output != 0:
+                    self.module.fail_json(msg="There was an issue installing the collector")
+                #end if
+            #end if not
+        else:
+            self.module.fail_json(msg="Error: LogicMonitor Collector must be installed on a Linux device.")
+        #end if
+    #end install
+
+    def uninstall(self):
+        """Uninstall LogicMontitor collector from the system"""
+        uninstallfile = self.installdir + "/agent/bin/uninstall.pl"
+        if os.path.isfile(uninstallfile):
+            self.change = True #set change flag to show that something was update
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            #end if
+            output = call([uninstallfile])
+            if output != 0:
+                self.module.fail_json(msg="There was an issue installing the collector")
+            #end if
+        else:
+            self.module.fail_json(msg="Unable to uninstall LogicMonitor Collector. Can not find LogicMonitor uninstaller.")
+        #end if
+    #end uninstall
+    
+    def start(self):
+        """Start the LogicMonitor collector"""
+        if self.platform == "Linux":
+            a = Popen(["service", "logicmonitor-agent", "status"], stdout=subprocess.PIPE)
+            (aoutput, aerror) = a.communicate()
+            if "is running" not in aoutput:
+                self.change = True #set change flag to show that something was update
+                if self.module.check_mode:
+                    self.module.exit_json(changed=True)
+                #end if
+                call(["service", "logicmonitor-agent", "start"])
+            #end if
+            w = Popen(["service", "logicmonitor-watchdog", "status"], stdout=subprocess.PIPE)
+            (woutput, werror) = w.communicate()
+            if "is running" not in woutput:
+                self.change = True #set change flag to show that something was update
+                if self.module.check_mode:
+                    self.module.exit_json(changed=True)
+                #end if
+                call(["service", "logicmonitor-watchdog", "start"])
+            #end if
+        else:
+            self.module.fail_json(msg="Error: LogicMonitor Collector must be installed on a Linux device.")
+        #end if
+    #end start
+    
+    def restart(self):
+        """Restart the LogicMonitor collector"""
+        """Start the LogicMonitor collector"""
+        if self.platform == "Linux":
+            call(["service", "logicmonitor-agent", "restart"])
+            call(["service", "logicmonitor-watchdog", "restart"])
+        else:
+            self.module.fail_json(msg="Error: LogicMonitor Collector must be installed on a Linux device.")
+        #end if
+    #end restart
+    
+    def stop(self):
+        """Stop the LogicMonitor collector"""
+        if self.platform == "Linux":
+            a = Popen(["service", "logicmonitor-agent", "status"], stdout=subprocess.PIPE)
+            (aoutput, aerror) = a.communicate()
+            if "is running" in aoutput:
+                call(["service", "logicmonitor-agent", "stop"])
+            #end if
+            w = Popen(["service", "logicmonitor-watchdog", "status"], stdout=subprocess.PIPE)
+            (woutput, werror) = w.communicate()
+            if "is running" in woutput:
+                call(["service", "logicmonitor-watchdog", "stop"])
+            #end if
+        else:
+            self.module.fail_json(msg="Error: LogicMonitor Collector must be installed on a Linux device.")
+        #end if
+    #end stop
+    
+
+    ####################################
+    #                                  #
+    #    internal methods              #
+    #                                  #
+    ####################################    
+
+    def _get(self):
+        """Returns a JSON object representing the collector"""
+        collector_list = self._getcollectors()
+        if collector_list is not None:
+            for collector in collector_list:
+                if collector["description"] == self.fqdn:
+                    return collector
+                #end if
+            #end for
+        #end if
+        return None
+    #end _get
+    
+
+    def _getcollectors(self):
+        """Returns a JSON object containing a list of LogicMonitor collectors"""
+        resp = self.rpc("getAgents", {})
+        resp_json = json.loads(resp)
+        if resp_json["status"] is 200:
+             return resp_json["data"]
+        else:
+            self.module.fail_json(msg=resp)
+        #end if
+    #end _getcollectors
+    
+    def _create(self):
+        """Create a new collector in the LogicMonitor account associated with this device"""
+        if self._get() is None:
+            self.change = True #set change flag to show that something was update
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            #end if
+            create_json = json.loads(self.rpc("addAgent", {"autogen": True, "description": self.fqdn}))
+            if create_json["status"] is 200:
+                return create_json["data"]
+            else:
+                self.module.fail_json(msg=json.dumps(msg=create_json))
+            #end if
+        else:
+            return self._get()
+        #end if
+    #end create
+
+    def _delete(self):
+        """Delete this collector from the associated LogicMonitor account"""
+        if self._get is not None:
+            delete_json = json.loads(self.rpc("deleteAgent", {"id": self.id}))
+            if delete_json["status"] is 200:
+                return delete_json["data"]
+            else:
+                self.module.fail_json(msg=json.dumps(msg=delete_json))
+            #end if
+        else:
+            return None
+        # end if
+    #end delete
+
+#end Collector
+
 #========================================
+
+def selector(module):
+    """Figure out which object and which actions to take given the right parameters"""
+    if module.params['target'] == 'collector':
+        target = Collector(module)
+    # elif module.params['target'] == 'host':
+    #     pass
+    # elif module.params['target'] == 'hostgroup':
+    #     pass
+    else: #handles the EOTW case
+        module.fail_json(msg="Error: Something very strange happened. An unexpected target was specified.")
+    #end
+    
+    if module.params['action'] == 'add':
+        action = target.create
+    # elif module.params['action'] == 'remove':
+    #     action = remove
+    # elif module.params['action'] == 'sdt':
+    #     action = sdt
+    else:
+        module.fail_json(msg="Error: Something very strange happened. An unexpected action was specified.")
+    #end if
+    
+    exit_code = action()
+    module.exit_json(changed=target.change)
+    
+#end selector
+    
 
 def main():
     """docstring for main"""
-    lm_defaults = {}
+    TARGETS=[
+        'collector',
+        'host',
+        'hostgroup',
+    ]
+    
+    ACTIONS=[
+        'add',
+        'remove',
+        # 'install',   # possibly add for more granularity of collector management
+        # 'uninstall',
+        # 'start',
+        # 'stop',
+        'sdt',
+    ]
     
     module = AnsibleModule(
         argument_spec = dict(
-            #add args here
+            target=dict(required=False, default=None, choices=TARGETS),
+            action=dict(required=True, default=None, choices=ACTIONS),
+            company=dict(required=True, default=None),
+            user=dict(required=True, default=None),
+            password=dict(required=True, default=None),
+            hostname=dict(required=False, default=None),
+            displayname=dict(required=False, default=None),
+            properties=dict(required=False, default=None),
+            groups=dict(required=False, default=None),
+            fullpath=dict(required=False, default=None),
         ),
         supports_check_mode=True
     )
 
+    selector(module)
+    #end if    
 #end main
 
 # include magic from lib/ansible/module_common.py

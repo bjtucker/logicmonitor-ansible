@@ -9,51 +9,76 @@
 # Author: Ethan Culler-Mayeno
 #
 
-import urllib
-import urlparse
 import sys
 import json
 import os
-import shlex
-import logicmonitor
+from logicmonitor import LogicMonitor
 
-class lm_host(LogicMonitor):
+class Host(LogicMonitor):
     
-    def __init__(self, args):
-        args_file = sys.argv[1]
-        args_data = file(args_file).read()
-
+    def __init__(self, collector, hostname=None, displayname=None, properties={}, groups=[], alertenable=True, credentials_file="/tmp/lm_credentials.txt"):
+        """Initializor for the LogicMonitor host object"""
+        LogicMonitor.__init__(self, credentials_file)
+        self.collector = collector
+        self.hostname = hostname or self.fqdn
+        self.displayname = displayname or self.fqnd
+            
     #end __init__
-
-    def __new__(self, args):
-        pass
-    #end __new__
+    
+    ####################################
+    #                                  #
+    #    Public methods                #
+    #                                  #
+    ####################################    
     
     
-    def get_hosts():
+    def getproperties(self, host):
+        """Returns a hash of the properties associated with this LogicMonitor host"""
         pass
-    #end getHosts
+    #end getproperties
 
-    def get_host_by_hostname(hostname, collector):
+    def setproperties(self, host, propertyhash):
+        """update the host to have the properties contained in the property hash"""
         pass
-    #end get_host_by_hostname
+    #end setproperties
 
-    def get_host_by_displayname(displayname):
-        pass
-    #end get_host_by_displayname
-
-    def get_host_props(self, host):
-        """docstring for get_host_props"""
-        pass
-    #end get_host_props
-
-    def add_host():
+    def add(self):
+        """Add this device to monitoring in your LogicMonitor account"""
         pass
     #end add_host
 
-    def update_host():
+    def update(self):
+        """This method takes changes made to this host and applies them to the corresponding host in your LogicMonitor account."""
         pass
     #end update_host
+    
+    def remove(self):
+        """remove this host from your LogicMonitor account"""
+        pass
+    #end remove
 
+    def sdt(self, starttime, duration):
+        """create a scheduled down time (maintenance window) for this host"""
+        pass
+    #end sdt
+
+    ####################################
+    #                                  #
+    #    internal utility methods      #
+    #                                  #
+    ####################################    
+
+    def _gethosts():
+        pass
+    #end getHosts
+
+    def _gethostbyhostname(hostname, collector):
+        pass
+    #end get_host_by_hostname
+
+    def _gethostbydisplayname(displayname):
+        pass
+    #end get_host_by_displayname
+    
 
 #end class lm_host

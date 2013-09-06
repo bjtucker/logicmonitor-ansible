@@ -19,38 +19,34 @@ from subprocess import Popen
 from logicmonitor import LogicMonitor
 
 class Collector(LogicMonitor):
-    
-    ####################################
-    #                                  #
-    #    create/initialize/destroy     #
-    #                                  #
-    ####################################
-    
-    
-    def __init__(self, installdir="/usr/local/logicmonitor", credentials_file="/tmp/lm_credentials.txt"):
+        
+    def __init__(self, installdir="/usr/local/logicmonitor", credentials_file="/tmp/lm_credentials.txt", description=None):
         """Initializor for the LogicMonitor Collector object"""
         LogicMonitor.__init__(self, credentials_file)
-        info = self.create()
+        info = self._get()
+        if info:
+            self.id        = info["id"]
+        else:
+            self.id        = None
         #end if
-        self.id     = info["id"]
-        self.isdown = info["isDown"]
         if not os.path.exists(installdir):
             os.makedir(installdir)
         #end if
+        self.description   = description or self.fqdn
         self.installdir    = installdir
-        self.platform = platform.system()
+        self.platform      = platform.system()
         self.is_64bits     = sys.maxsize > 2**32
     #end __init__
         
     ####################################
     #                                  #
-    #    Public API functions          #
+    #    Public methods                #
     #                                  #
     ####################################
     
     def create(self):
         """Create a new collector in the LogicMonitor account associated with this device"""
-        if self._get() is None:
+        if self.id is None:
             create_json = json.loads(self.rpc("addAgent", {"autogen": True, "description": self.fqdn}))
             if create_json["status"] is 200:
                 return create_json["data"]
@@ -65,7 +61,7 @@ class Collector(LogicMonitor):
 
     def delete(self):
         """Delete this collector from the associated LogicMonitor account"""
-        if self._get is not None:
+        if self.id is not None:
             delete_json = json.loads(self.rpc("deleteAgent", {"id": self.id}))
             if delete_json["status"] is 200:
                 return delete_json["data"]
@@ -78,25 +74,6 @@ class Collector(LogicMonitor):
         # end if
     #end delete
     
-    def getid(self):
-        """Accessor method to get the id number of the LogicMonitor Collector"""
-        return self.id
-    #end get_collector
-
-    def getinstalldir(self):
-        """Return path of the directory for installation of the LogicMonitor collector"""
-        return self.installdir
-    #end getinstalldir
-    
-    def setinstalldir(self, newinstalldir):
-        """Verifies that the directory specified exists.
-        sets as the LogicMonitor collector installation location"""
-        if not os.path.exists(newinstalldir):
-            os.makedirs(newinstalldir)
-        #end if
-        self.installdir = newinstalldir
-    #end setinstalldir
-
     def getinstallerbin(self):
         """Download the LogicMonitor collector installer binary"""
         arch = 32
@@ -109,7 +86,7 @@ class Collector(LogicMonitor):
             if not os.path.isfile(installfilepath):             #else create the installer file and return the file object
                 with open(installfilepath, "w") as f:
                     installer = self.do("logicmonitorsetup", {"id": self.id, "arch": arch})
-		    f.write(installer)
+                    f.write(installer)
                 f.closed
                 #end with
             #end if not
@@ -205,7 +182,7 @@ class Collector(LogicMonitor):
 
     ####################################
     #                                  #
-    #    internal utility functions    #
+    #    internal methods              #
     #                                  #
     ####################################    
 
@@ -214,7 +191,7 @@ class Collector(LogicMonitor):
         collector_list = self._getcollectors()
         if collector_list is not None:
             for collector in collector_list:
-                if collector["description"] == self.fqdn:
+                if collector["description"] == self.description:
                     return collector
                 #end if
             #end for
