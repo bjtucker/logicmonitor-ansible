@@ -68,7 +68,18 @@ class LogicMonitor:
             print ioe
             sys.exit(1)
         #end try
-    #end rpc
+    #end do
+
+    def getcollectors(self):
+        """Returns a JSON object containing a list of LogicMonitor collectors"""
+        resp = self.rpc("getAgents", {})
+        resp_json = json.loads(resp)
+        if resp_json["status"] is 200:
+             return resp_json["data"]
+        else:
+            self.module.fail_json(msg=resp)
+        #end if
+    #end getcollectors
 
     
 #end LogicMonitor

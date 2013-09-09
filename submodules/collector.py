@@ -20,19 +20,19 @@ from logicmonitor import LogicMonitor
 
 class Collector(LogicMonitor):
         
-    def __init__(self, installdir="/usr/local/logicmonitor", credentials_file="/tmp/lm_credentials.txt", description=None):
+    def __init__(self, description=None, installdir="/usr/local/logicmonitor", credentials_file="/tmp/lm_credentials.txt"):
         """Initializor for the LogicMonitor Collector object"""
         LogicMonitor.__init__(self, credentials_file)
-        info = self._get()
-        if info:
-            self.id        = info["id"]
+        self.description = description or self.fqdn
+        self.info = self._get()
+        if self.info:
+            self.id        = self.info["id"]
         else:
             self.id        = None
         #end if
         if not os.path.exists(installdir):
             os.makedir(installdir)
         #end if
-        self.description   = description or self.fqdn
         self.installdir    = installdir
         self.platform      = platform.system()
         self.is_64bits     = sys.maxsize > 2**32
@@ -44,18 +44,23 @@ class Collector(LogicMonitor):
     #                                  #
     ####################################
     
+    
     def create(self):
         """Create a new collector in the LogicMonitor account associated with this device"""
         if self.id is None:
-            create_json = json.loads(self.rpc("addAgent", {"autogen": True, "description": self.fqdn}))
+            create_json = json.loads(self.rpc("addAgent", {"autogen": True, "description": self.description}))
             if create_json["status"] is 200:
+                self.info = create_json["data"]
+                self.id = create_json["data"]["id"]
                 return create_json["data"]
             else:
                 print "Error: Unable to create a new collector"
                 print json.dumps(create_json)
             #end if
         else:
-            return self._get()
+            self.info = self._get()
+            self.id = self.info['id']
+            return self.info
         #end if
     #end create
 
@@ -188,7 +193,7 @@ class Collector(LogicMonitor):
 
     def _get(self):
         """Returns a JSON object representing the collector"""
-        collector_list = self._getcollectors()
+        collector_list = self.getcollectors()
         if collector_list is not None:
             for collector in collector_list:
                 if collector["description"] == self.description:
@@ -197,21 +202,8 @@ class Collector(LogicMonitor):
             #end for
         #end if
         return None
-    #end _get
-    
-
-    def _getcollectors(self):
-        """Returns a JSON object containing a list of LogicMonitor collectors"""
-        resp = self.rpc("getAgents", {})
-        resp_json = json.loads(resp)
-        if resp_json["status"] is 200:
-            return resp_json["data"]
-        else:
-            print "Error: Unable to retrieve the list of collectors from the server"
-            print "Exiting"
-            sys.exit(1)
-        #end if
-    #end _getcollectors
-        
+    #end _get        
 
 #end Collector
+
+c = Collector("description")

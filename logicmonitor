@@ -69,7 +69,19 @@ class LogicMonitor(object):
             print ioe
             sys.exit(1)
         #end try
-    #end rpc
+    #end do
+    
+    def getcollectors(self):
+        """Returns a JSON object containing a list of LogicMonitor collectors"""
+        resp = self.rpc("getAgents", {})
+        resp_json = json.loads(resp)
+        if resp_json["status"] is 200:
+             return resp_json["data"]
+        else:
+            self.module.fail_json(msg=resp)
+        #end if
+    #end getcollectors
+    
 #end Logicmonitor
 
 class Collector(LogicMonitor):
@@ -78,21 +90,19 @@ class Collector(LogicMonitor):
     def __init__(self, module):
         """Initializor for the LogicMonitor Collector object"""
         LogicMonitor.__init__(self, module, **module.params)
-        info                = self._get()
+        if module.params['description']:
+            self.description    = module.params['description']
+        else:
+            self.description = self.fqdn
+        #end if
+        self.info           = self._get()
         self.installdir     = "/usr/local/logicmonitor"
         self.change     = False
-        if info is None:
-            if self.module.check_mode:
-                self.module.exit_json(changed=True)
-            else:
-                info        = self._create()
-                if not os.path.exists(self.installdir):
-                    os.makedir(installdir)
-                 #end if
-            #end if
+        if self.info is None:
+            self.id         = None
+        else:
+            self.id         = self.info["id"]
         #end if
-        self.id             = info["id"]
-        self.isdown         = info["isDown"]
         self.platform       = platform.system()
         self.is_64bits      = sys.maxsize > 2**32
     #end __init__
@@ -118,26 +128,6 @@ class Collector(LogicMonitor):
         self._delete()
     #end create
     
-    
-    def getid(self):
-        """Accessor method to get the id number of the LogicMonitor Collector"""
-        return self.id
-    #end get_collector
-
-    def getinstalldir(self):
-        """Return path of the directory for installation of the LogicMonitor collector"""
-        return self.installdir
-    #end getinstalldir
-    
-    def setinstalldir(self, newinstalldir):
-        """Verifies that the directory specified exists.
-        sets as the LogicMonitor collector installation location"""
-        if not os.path.exists(newinstalldir):
-            os.makedirs(newinstalldir)
-        #end if
-        self.installdir = newinstalldir
-    #end setinstalldir
-
     def getinstallerbin(self):
         """Download the LogicMonitor collector installer binary"""
         arch = 32
@@ -268,44 +258,37 @@ class Collector(LogicMonitor):
 
     def _get(self):
         """Returns a JSON object representing the collector"""
-        collector_list = self._getcollectors()
+        collector_list = self.getcollectors()
         if collector_list is not None:
             for collector in collector_list:
-                if collector["description"] == self.fqdn:
+                if collector["description"] == self.description:
                     return collector
                 #end if
             #end for
         #end if
         return None
     #end _get
-    
-
-    def _getcollectors(self):
-        """Returns a JSON object containing a list of LogicMonitor collectors"""
-        resp = self.rpc("getAgents", {})
-        resp_json = json.loads(resp)
-        if resp_json["status"] is 200:
-             return resp_json["data"]
-        else:
-            self.module.fail_json(msg=resp)
-        #end if
-    #end _getcollectors
-    
+        
     def _create(self):
         """Create a new collector in the LogicMonitor account associated with this device"""
-        if self._get() is None:
+        ret = self._get()
+        if ret is None:
             self.change = True #set change flag to show that something was update
             if self.module.check_mode:
                 self.module.exit_json(changed=True)
             #end if
-            create_json = json.loads(self.rpc("addAgent", {"autogen": True, "description": self.fqdn}))
+            create_json = json.loads(self.rpc("addAgent", {"autogen": True, "description": self.description}))
             if create_json["status"] is 200:
+                self.info = create_json["data"]
+                self.id = create_json["data"]["id"]
                 return create_json["data"]
             else:
                 self.module.fail_json(msg=json.dumps(msg=create_json))
             #end if
         else:
-            return self._get()
+            self.info = ret
+            self.id = ret["id"]
+            return ret
         #end if
     #end create
 
@@ -331,10 +314,12 @@ def selector(module):
     """Figure out which object and which actions to take given the right parameters"""
     if module.params['target'] == 'collector':
         target = Collector(module)
-    # elif module.params['target'] == 'host':
-    #     pass
-    # elif module.params['target'] == 'hostgroup':
-    #     pass
+    elif module.params['target'] == 'host':
+        #target = Host(module)
+        pass
+    elif module.params['target'] == 'hostgroup':
+        #target = Hostgroup(module)
+        pass
     else: #handles the EOTW case
         module.fail_json(msg="Error: Something very strange happened. An unexpected target was specified.")
     #end
@@ -382,6 +367,7 @@ def main():
             password=dict(required=True, default=None),
             hostname=dict(required=False, default=None),
             displayname=dict(required=False, default=None),
+            description=dict(required=False, default=None),
             properties=dict(required=False, default=None),
             groups=dict(required=False, default=None),
             fullpath=dict(required=False, default=None),
