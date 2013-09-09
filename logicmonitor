@@ -308,6 +308,291 @@ class Collector(LogicMonitor):
 
 #end Collector
 
+class Host(LogicMonitor):
+    
+    def __init__(self, module):
+        """Initializor for the LogicMonitor host object"""
+        LogicMonitor.__init__(self, module)
+        if module.params["collector"]:
+            self.collector   = self._getcollectorbydescription(module.params["collector"])
+        else:
+            module.fail_json(msg="Collector parameter is required for managing hosts")
+        #end if
+        if module.params["hostname"]:
+            self.hostname    = module.params['hostname']
+        else:
+            self.hostname    = self.fqdn
+        #end if
+        if module.params["displayname"]:
+            self.displayname = module.params['displayname']
+        else:
+            self.displayname = self.fqdn
+        #end if
+        self.info = self._gethostbydisplayname(self.displayname) or self._gethostbyhostname(self.hostname)
+        if module.params["properties"]:
+            self.properties  = properties
+        else:
+            self.properties  = {}
+        #end if
+        if module.params["groups"]:
+            self.groups      = groups
+        else:
+            self.groups      = []
+        #end if
+        if module.params[""]:
+            self.description = description
+        else:
+            self.description = None
+        #end if
+        if module.params[""]:
+            self.alertenable = alertenable
+        else:
+            self.alertenable = True
+        #end if
+    #end __init__
+    
+    ####################################
+    #                                  #
+    #    Public methods                #
+    #                                  #
+    ####################################    
+    
+    
+    def getproperties(self):
+        """Returns a hash of the properties associated with this LogicMonitor host"""
+        if self.info:
+            properties_json = json.loads(self.rpc("getHostProperties", {'hostId': self.info["id"], "filterSystemProperties": True, "finalResult": False}))
+            if properties_json["status"] == 200:
+                return properties_json["data"]
+            else:
+                print "Error: there was an issue retrieving the host properties"
+                print json.dumps(properties_json)
+                exit(properties_json["status"])
+            #end if
+        else:
+            print "Unable to find LogicMonitor host which matches {0} ({1})".format(self.displayname, self.hostname) 
+            return None
+        #end
+    #end getproperties
+
+    def setproperties(self, propertyhash):
+        """update the host to have the properties contained in the property hash"""
+        self.properties = propertyhash
+    #end setproperties
+
+    def add(self):
+        """Add this device to monitoring in your LogicMonitor account"""
+        if not self.info:
+            return self.rpc("addHost", self._buildhosthash( self.hostname, self.displayname, self.collector, self.description, self.groups, self.properties, self.alertenable))
+        #end if
+    #end add_host
+
+    def update(self):
+        """This method takes changes made to this host and applies them to the corresponding host in your LogicMonitor account."""
+        if self.info:
+            if self.ischanged():
+                h =  self._buildhosthash( self.hostname, self.displayname, self.collector, self.description, self.groups, self.properties, self.alertenable)
+                h["id"] = self.info["id"]
+                resp = json.loads(self.rpc("updateHost", h))
+                if resp["status"] == 200:
+                    return resp["data"]
+                else:
+                    self.module"Error: unable to update the host."
+                    exit(resp["status"])
+            else:
+                return self.info
+            #end if
+        else:
+            return self.rpc("addHost", self._buildhosthash( self.hostname, self.displayname, self.collector, self.description, self.groups, self.properties, self.alertenable))
+        #end if
+    #end update_host
+        
+    def remove(self):
+        """remove this host from your LogicMonitor account"""
+        if self.info:
+            return json.loads(self.rpc("deleteHost", {"id": self.info["id"], "deleteFromSystem": True, "hostGroupId": 1}))
+        #end if
+    #end remove
+    
+    def ischanged(self):
+        """Return true if the host doesn't match the LogicMonitor account"""
+        ignore = ['system.categories']
+        hostresp = self._gethostbydisplayname(self.displayname)
+        propresp = self.getproperties()
+        if propresp and hostresp:
+            p = {}
+            for prop in propresp:
+                if prop["name"] not in ignore:
+                    if "*******" in prop["value"] and self._verifyproperty(prop["name"]):
+                        p[prop["name"]] = self.properties[prop["name"]]
+                    else:
+                        p[prop["name"]] = prop["value"]
+                    #end if
+                #end if
+            #end for
+            return set(p) != set(self.properties)
+        else:
+            exit(1)
+        #end if
+        return False
+    #end ischanged
+    
+    def getsdts(self):
+        """return list of scheduled down time (SDT) objects set on this host."""
+        pass
+    #end getsdts
+
+    def sdt(self, starttime, duration):
+        """create a scheduled down time (maintenance window) for this host"""
+        pass
+    #end sdt
+
+    ####################################
+    #                                  #
+    #    internal utility methods      #
+    #                                  #
+    ####################################    
+
+    def _gethostbyhostname(self, hostname):
+        hostlist_json = json.loads(self.rpc("getHosts", {"hostGroupId": 1}))
+        if hostlist_json["status"] == 200:
+            hosts = hostlist_json["data"]["hosts"]
+            for host in hosts:
+                if host["hostName"] == hostname and host["agentId"] == self.collector["id"]:
+                    return host
+                #end if
+            #end for
+            return None
+        else:
+            module.fail_json(msg="Unable to retrieve host list from server.\n%s" %hostlist_json["errmsg"])
+        #end if
+    #end gethostbyhostname
+
+    def _gethostbydisplayname(self, displayname):
+        host_json = json.loads(self.rpc("getHost", {"displayName": displayname}))
+        if host_json["status"] == 200:
+            return host_json["data"]
+        else:
+            module.fail_json(msg="Unable to retrive host information from server.\n%s"%host_json[errmsg])
+        #end if
+    #end gethostbydisplayname
+    
+    def _getcollectorbydescription(self, description):
+        """return the collector json object for the collector with the matching FQDN (description) in your LogicMonitor account"""
+        collector_list = self.getcollectors()
+        if collector_list is not None:
+            for collector in collector_list:
+                if collector["description"] == description:
+                    return collector
+                #end if
+            #end for
+        #end if
+        return None
+    #end getcollectorbydescription
+    
+    def _getgroup(self, fullpath):
+        """Return a JSON object with the current state of a group in your LogicMonitor account"""
+        resp = json.loads(self.rpc("getHostGroups", {}))
+        if resp["status"] == 200:
+            groups = resp["data"]
+            for group in groups:
+                if group["fullPath"] == fullpath.lstrip('/'):
+                    return group
+                #end if
+            #end for
+        else:
+            module.fail_json(msg="Error: Unable to retreive the list of host groups from the server.")
+        #end if
+        return None
+    #end _getgroup
+    
+    def _creategroup(self, fullpath):
+        """Recursively create a path of host groups. return value is the id of the newly created hostgroup in your LogicMonitor account"""
+        if self._getgroup(fullpath):
+            return self._getgroup(fullpath)["id"]
+        #end if
+        parentpath, name = fullpath.rsplit('/', 1)
+        parentgroup = self._getgroup(parentpath)
+        if fullpath == "/":
+            return 1
+        elif parentpath == "":
+            parentid = 1
+            resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": parentid, "alertEnable": True}))
+            if resp["status"] == 200:
+                return resp["data"]["id"]
+            else:
+                module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
+            #end if
+        elif parentgroup:
+            parentid = parentgroup["id"]
+            resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": parentid, "alertEnable": True}))
+            if resp["status"] == 200:
+                return resp["data"]["id"]
+            else:
+                module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
+            #end if
+        else:
+            resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": self._creategroup(parentpath), "alertEnable": True}))
+            if resp["status"] == 200:
+                return resp["data"]["id"]
+            else:
+                module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
+            #end if
+            
+        #end if
+    #end _createparentgroup
+    
+    def _buildhosthash(self, hostname, displayname, collector, description, groups, properties, alertenable):
+        """Return a property formated hash for the creation of a host using the rpc function"""
+        h = {}
+        h["hostName"] = hostname
+        h["displayedAs"] = displayname
+        if collector:
+            h["agentId"] = collector["id"]
+        else:
+            module.fail_json(msg="Error: Unable to build host hash. No collector found.")
+        #end if
+        if description:
+            h["description"] = description
+        #end if
+        if groups != []:
+            groupids = ""
+            for group in groups:
+                groupids = groupids + str(self._creategroup(group)) + ","
+            #end for
+            h["hostGroupIds"] = groupids.rstrip(',')
+        #end if
+        if properties != {}:
+            propnum = 0
+            for key, value in properties.iteritems():
+                h["propName{0}".format(str(propnum))] = key
+                h["propValue{0}".format(str(propnum))] = value
+                propnum = propnum + 1
+            #end for
+        #end if
+        h["alertEnable"] = alertenable
+        return h
+    #end _buildhosthash
+    
+    def _verifyproperty(self, propname):
+        """Check with LogicMonitor server to verify property is unchanged"""
+        if self.info:
+            if propname not in self.properties:
+                return False
+            else:
+                resp = json.loads(self.rpc('verifyProperties', {"hostId": self.info["id"], "propName0": propname, "propValue0": self.properties[propname]}))
+                if resp["status"] == 200:
+                    return resp["data"]["match"]
+                else:
+                    module.fail_json(msg="Error: unable to get verification from server.\n%s" % resp["errmsg"])
+            #end if
+        else:
+            module.fail_json(msg="Error: Can not verify properties of a host which doesn't exist")
+    #end _verifyproperty
+    
+    
+#end class lm_host
+
 #========================================
 
 def selector(module):
