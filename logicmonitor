@@ -90,7 +90,7 @@ class Collector(LogicMonitor):
     def __init__(self, module):
         """Initializor for the LogicMonitor Collector object"""
         LogicMonitor.__init__(self, module, **module.params)
-        if module.params['description']:
+        if self.module.params['description']:
             self.description    = module.params['description']
         else:
             self.description = self.fqdn
@@ -312,43 +312,29 @@ class Host(LogicMonitor):
     
     def __init__(self, module):
         """Initializor for the LogicMonitor host object"""
-        LogicMonitor.__init__(self, module)
-        if module.params["collector"]:
-            self.collector   = self._getcollectorbydescription(module.params["collector"])
+        LogicMonitor.__init__(self, module, **module.params)
+        if self.module.params["collector"]:
+            self.collector   = self._getcollectorbydescription(self.module.params["collector"])
         else:
-            module.fail_json(msg="Collector parameter is required for managing hosts")
+            self.module.fail_json(msg="Collector parameter is required for managing hosts")
         #end if
-        if module.params["hostname"]:
-            self.hostname    = module.params['hostname']
+        if self.module.params["hostname"]:
+            self.hostname    = self.module.params['hostname']
         else:
             self.hostname    = self.fqdn
         #end if
-        if module.params["displayname"]:
-            self.displayname = module.params['displayname']
+        if self.module.params["displayname"]:
+            self.displayname = self.module.params['displayname']
         else:
             self.displayname = self.fqdn
         #end if
         self.info = self._gethostbydisplayname(self.displayname) or self._gethostbyhostname(self.hostname)
-        if module.params["properties"]:
-            self.properties  = properties
-        else:
-            self.properties  = {}
-        #end if
-        if module.params["groups"]:
-            self.groups      = groups
-        else:
-            self.groups      = []
-        #end if
-        if module.params[""]:
-            self.description = description
-        else:
-            self.description = None
-        #end if
-        if module.params[""]:
-            self.alertenable = alertenable
-        else:
-            self.alertenable = True
-        #end if
+#        if self.module.params["properties"].instanceof(str):
+        self.properties  = self.module.params["properties"]
+        self.groups      = self.module.params["groups"]
+        self.description = self.module.params["description"]
+        self.alertenable = self.module.params["alertenable"]
+        self.change = False
     #end __init__
     
     ####################################
@@ -357,6 +343,12 @@ class Host(LogicMonitor):
     #                                  #
     ####################################    
     
+    
+    def create(self):
+        """Idemopotent function to create if missing, update if changed, or skip"""
+        self.update()
+    #end create
+        
     
     def getproperties(self):
         """Returns a hash of the properties associated with this LogicMonitor host"""
@@ -383,6 +375,10 @@ class Host(LogicMonitor):
     def add(self):
         """Add this device to monitoring in your LogicMonitor account"""
         if not self.info:
+            self.change = True
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            #end if
             return self.rpc("addHost", self._buildhosthash( self.hostname, self.displayname, self.collector, self.description, self.groups, self.properties, self.alertenable))
         #end if
     #end add_host
@@ -391,18 +387,27 @@ class Host(LogicMonitor):
         """This method takes changes made to this host and applies them to the corresponding host in your LogicMonitor account."""
         if self.info:
             if self.ischanged():
+                self.change = True
+                if self.module.check_mode:
+                    self.module.exit_json(changed=True)
+                #end if
                 h =  self._buildhosthash( self.hostname, self.displayname, self.collector, self.description, self.groups, self.properties, self.alertenable)
                 h["id"] = self.info["id"]
                 resp = json.loads(self.rpc("updateHost", h))
+                self.module.exit_json(changed=True, msg=json.dumps(resp))
                 if resp["status"] == 200:
                     return resp["data"]
                 else:
-                    self.module"Error: unable to update the host."
+                    self.module.fail_json(msg="Error: unable to update the host.")
                     exit(resp["status"])
             else:
                 return self.info
             #end if
         else:
+            self.change = True
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            #end if
             return self.rpc("addHost", self._buildhosthash( self.hostname, self.displayname, self.collector, self.description, self.groups, self.properties, self.alertenable))
         #end if
     #end update_host
@@ -410,6 +415,10 @@ class Host(LogicMonitor):
     def remove(self):
         """remove this host from your LogicMonitor account"""
         if self.info:
+            self.change = True
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            #end if
             return json.loads(self.rpc("deleteHost", {"id": self.info["id"], "deleteFromSystem": True, "hostGroupId": 1}))
         #end if
     #end remove
@@ -417,9 +426,42 @@ class Host(LogicMonitor):
     def ischanged(self):
         """Return true if the host doesn't match the LogicMonitor account"""
         ignore = ['system.categories']
-        hostresp = self._gethostbydisplayname(self.displayname)
+        hostresp = self._gethostbydisplayname(self.displayname) or self._gethostbyhostname(self.hostname)
         propresp = self.getproperties()
         if propresp and hostresp:
+            if hostresp["alertEnable"] != self.alertenable:
+                return True
+            #end if
+            if hostresp["description"] != self.description:
+                return True
+            #end if
+            if hostresp["displayedAs"] != self.displayname:
+                return True
+            #end if
+            if hostresp["agentId"] != self.collector["id"]:
+                return True
+            #end if
+            g = []
+            fullpathinids = hostresp["fullPathInIds"]
+            for path in fullpathinids:
+                hgresp = json.loads(self.rpc("getHostGroup", {'hostGroupId': path[-1]}))
+                if hgresp["status"] == 200 and hgresp["data"]["appliesTo"] == "":
+                    g.append(path[-1])
+                #end if
+            #end for
+            for group in self.groups:
+                groupjson = self._getgroup(group)
+                if groupjson is None:
+                    return True
+                elif groupjson['id'] not in g:
+                    return True
+                else:
+                    g.remove(groupjson['id'])
+                #end if
+            #end for
+            if g != []:
+                return True
+            #end
             p = {}
             for prop in propresp:
                 if prop["name"] not in ignore:
@@ -430,7 +472,10 @@ class Host(LogicMonitor):
                     #end if
                 #end if
             #end for
-            return set(p) != set(self.properties)
+            
+            if set(p) != set(self.properties):
+                return True
+            #end if
         else:
             exit(1)
         #end if
@@ -464,7 +509,7 @@ class Host(LogicMonitor):
             #end for
             return None
         else:
-            module.fail_json(msg="Unable to retrieve host list from server.\n%s" %hostlist_json["errmsg"])
+           return None
         #end if
     #end gethostbyhostname
 
@@ -473,7 +518,7 @@ class Host(LogicMonitor):
         if host_json["status"] == 200:
             return host_json["data"]
         else:
-            module.fail_json(msg="Unable to retrive host information from server.\n%s"%host_json[errmsg])
+           return None
         #end if
     #end gethostbydisplayname
     
@@ -501,7 +546,7 @@ class Host(LogicMonitor):
                 #end if
             #end for
         else:
-            module.fail_json(msg="Error: Unable to retreive the list of host groups from the server.")
+           self.module.fail_json(msg="Error: Unable to retreive the list of host groups from the server.")
         #end if
         return None
     #end _getgroup
@@ -517,26 +562,38 @@ class Host(LogicMonitor):
             return 1
         elif parentpath == "":
             parentid = 1
+            self.change = True
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            #end if
             resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": parentid, "alertEnable": True}))
             if resp["status"] == 200:
                 return resp["data"]["id"]
             else:
-                module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
+               self.module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
             #end if
         elif parentgroup:
             parentid = parentgroup["id"]
+            self.change = True
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            #end if
             resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": parentid, "alertEnable": True}))
             if resp["status"] == 200:
                 return resp["data"]["id"]
             else:
-                module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
+               self.module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
             #end if
         else:
+            self.change = True
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            #end if
             resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": self._creategroup(parentpath), "alertEnable": True}))
             if resp["status"] == 200:
                 return resp["data"]["id"]
             else:
-                module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
+               self.module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
             #end if
             
         #end if
@@ -550,7 +607,7 @@ class Host(LogicMonitor):
         if collector:
             h["agentId"] = collector["id"]
         else:
-            module.fail_json(msg="Error: Unable to build host hash. No collector found.")
+           self.module.fail_json(msg="Error: Unable to build host hash. No collector found.")
         #end if
         if description:
             h["description"] = description
@@ -584,10 +641,10 @@ class Host(LogicMonitor):
                 if resp["status"] == 200:
                     return resp["data"]["match"]
                 else:
-                    module.fail_json(msg="Error: unable to get verification from server.\n%s" % resp["errmsg"])
+                   self.module.fail_json(msg="Error: unable to get verification from server.\n%s" % resp["errmsg"])
             #end if
         else:
-            module.fail_json(msg="Error: Can not verify properties of a host which doesn't exist")
+           self.module.fail_json(msg="Error: Can not verify properties of a host which doesn't exist")
     #end _verifyproperty
     
     
@@ -600,8 +657,7 @@ def selector(module):
     if module.params['target'] == 'collector':
         target = Collector(module)
     elif module.params['target'] == 'host':
-        #target = Host(module)
-        pass
+        target = Host(module)
     elif module.params['target'] == 'hostgroup':
         #target = Hostgroup(module)
         pass
@@ -650,17 +706,23 @@ def main():
             company=dict(required=True, default=None),
             user=dict(required=True, default=None),
             password=dict(required=True, default=None),
+            collector=dict(required=False, default=None),
             hostname=dict(required=False, default=None),
             displayname=dict(required=False, default=None),
-            description=dict(required=False, default=None),
-            properties=dict(required=False, default=None),
-            groups=dict(required=False, default=None),
+            description=dict(required=False, default=""),
+            properties=dict(required=False, default={}),
+            groups=dict(required=False, default=[]),
             fullpath=dict(required=False, default=None),
+            alertenable=dict(required=False, default=True),
         ),
         supports_check_mode=True
     )
 
     selector(module)
+    # jsontest = json.loads(module.params["properties"])
+    # snmpcom = jsontest["snmp.community"]
+    # module.exit_json(changed=False, msg=snmpcom)
+#    module.exit_json(changed=False, msg=module.params["groups"])
     #end if    
 #end main
 

@@ -98,9 +98,42 @@ class Host(LogicMonitor):
     def ischanged(self):
         """Return true if the host doesn't match the LogicMonitor account"""
         ignore = ['system.categories']
-        hostresp = self._gethostbydisplayname(self.displayname)
+        hostresp = self._gethostbydisplayname(self.displayname) or self._gethostbyhostname(self.hostname)
         propresp = self.getproperties()
         if propresp and hostresp:
+            if hostresp["alertEnable"] != self.alertenable:
+                return True
+            #end if
+            if hostresp["description"] != self.description:
+                return True
+            #end if
+            if hostresp["displayedAs"] != self.displayname:
+                return True
+            #end if
+            if hostresp["agentId"] != self.collector["id"]:
+                return True
+            #end if
+            g = []
+            fullpathinids = hostresp["fullPathInIds"]
+            for path in fullpathinids:
+                hgresp = json.loads(self.rpc("getHostGroup", {'hostGroupId': path[-1]}))
+                if hgresp["status"] == 200 and hgresp["data"]["appliesTo"] == "":
+                    g.append(path[-1])
+                #end if
+            #end for
+            for group in self.groups:
+                groupjson = self._getgroup(group)
+                if groupjson is None:
+                    return True
+                elif groupjson['id'] not in g:
+                    return True
+                else:
+                    g.remove(groupjson['id'])
+                #end if
+            #end for
+            if g != []:
+                return True
+            #end
             p = {}
             for prop in propresp:
                 if prop["name"] not in ignore:
@@ -111,12 +144,17 @@ class Host(LogicMonitor):
                     #end if
                 #end if
             #end for
-            return set(p) != set(self.properties)
+            
+            if set(p) != set(self.properties):
+                return True
+            #end if
         else:
             exit(1)
         #end if
         return False
     #end ischanged
+
+
     
     def getsdts(self):
         """return list of scheduled down time (SDT) objects set on this host."""
