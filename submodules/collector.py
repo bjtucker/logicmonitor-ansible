@@ -14,6 +14,8 @@ import sys
 import os
 import platform
 import subprocess
+import datetime
+from datetime import datetime, time, tzinfo, timedelta
 from subprocess import call
 from subprocess import Popen
 from logicmonitor import LogicMonitor
@@ -184,6 +186,32 @@ class Collector(LogicMonitor):
         #end if
     #end stop
     
+    def sdt(self, duration=30, starttime=None):
+        """create a scheduled down time (maintenance window) for this host"""
+        accountresp = json.loads(self.rpc("getCompanySettings", {}))
+        if accountresp["status"] == 200:
+            offset = accountresp["data"]["offset"]
+            if starttime:
+                start = datetime.strptime(starttime, '%Y-%m-%d %H:%M')
+            else:
+                start = datetime.utcnow()
+            #end if
+            offsetstart = start + timedelta(0, offset)
+            offsetend = offsetstart + timedelta(0, duration*60)
+            resp = json.loads(self.rpc("setAgentSDT", {"agentId": self.id, "type": 1, "notifyCC": True,
+            "year": offsetstart.year, "month": offsetstart.month, "day": offsetstart.day, "hour": offsetstart.hour, "minute": offsetstart.minute,
+            "endYear": offsetend.year, "endMonth": offsetend.month, "endDay": offsetend.day, "endHour": offsetend.hour, "endMinute": offsetend.minute,
+            }))
+            if resp["status"] == 200:
+                return resp["data"]
+            else:
+                return None
+            #end
+        else:
+            print "Error: Unable to retrieve list of hosts from server"
+            exit(resp["status"])
+        #end if
+    #end sdt
 
     ####################################
     #                                  #
@@ -205,5 +233,3 @@ class Collector(LogicMonitor):
     #end _get        
 
 #end Collector
-
-c = Collector("description")

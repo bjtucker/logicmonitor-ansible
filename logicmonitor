@@ -12,6 +12,8 @@ import subprocess
 import hashlib
 import socket
 import shlex
+import datetime
+from datetime import datetime, time, tzinfo, timedelta
 from subprocess import call
 from subprocess import Popen
 
@@ -91,7 +93,7 @@ class Collector(LogicMonitor):
         """Initializor for the LogicMonitor Collector object"""
         LogicMonitor.__init__(self, module, **module.params)
         if self.module.params['description']:
-            self.description    = module.params['description']
+            self.description    = self.module.params['description']
         else:
             self.description = self.fqdn
         #end if
@@ -105,6 +107,8 @@ class Collector(LogicMonitor):
         #end if
         self.platform       = platform.system()
         self.is_64bits      = sys.maxsize > 2**32
+        self.duration       = self.module.params['duration']
+        self.starttime       = self.module.params['starttime']
     #end __init__
         
     ####################################
@@ -249,6 +253,33 @@ class Collector(LogicMonitor):
         #end if
     #end stop
     
+    def sdt(self):
+        duration = self.duration
+        starttime = self.starttime
+        """create a scheduled down time (maintenance window) for this host"""
+        accountresp = json.loads(self.rpc("getCompanySettings", {}))
+        if accountresp["status"] == 200:
+            offset = accountresp["data"]["offset"]
+            if starttime:
+                start = datetime.strptime(starttime, '%Y-%m-%d %H:%M')
+            else:
+                start = datetime.utcnow()
+            #end if
+            offsetstart = start + timedelta(0, offset)
+            offsetend = offsetstart + timedelta(0, duration*60)
+            resp = json.loads(self.rpc("setAgentSDT", {"agentId": self.id, "type": 1, "notifyCC": True,
+            "year": offsetstart.year, "month": offsetstart.month, "day": offsetstart.day, "hour": offsetstart.hour, "minute": offsetstart.minute,
+            "endYear": offsetend.year, "endMonth": offsetend.month, "endDay": offsetend.day, "endHour": offsetend.hour, "endMinute": offsetend.minute,
+            }))
+            if resp["status"] == 200:
+                return resp["data"]
+            else:
+                return None
+            #end
+        else:
+            self.module.fail_json(msg="Error: Unable to retrieve timezone offset")
+        #end if
+    #end sdt
 
     ####################################
     #                                  #
@@ -316,7 +347,7 @@ class Host(LogicMonitor):
         if self.module.params["collector"]:
             self.collector   = self._getcollectorbydescription(self.module.params["collector"])
         else:
-            self.module.fail_json(msg="Collector parameter is required for managing hosts")
+            self.collector   = None
         #end if
         if self.module.params["hostname"]:
             self.hostname    = self.module.params['hostname']
@@ -334,6 +365,8 @@ class Host(LogicMonitor):
         self.groups      = self.module.params["groups"]
         self.description = self.module.params["description"]
         self.alertenable = self.module.params["alertenable"]
+        self.starttime    = self.module.params["starttime"]
+        self.duration    = self.module.params["duration"]
         self.change = False
     #end __init__
     
@@ -374,7 +407,7 @@ class Host(LogicMonitor):
 
     def add(self):
         """Add this device to monitoring in your LogicMonitor account"""
-        if not self.info:
+        if self.collector and not self.info:
             self.change = True
             if self.module.check_mode:
                 self.module.exit_json(changed=True)
@@ -425,7 +458,7 @@ class Host(LogicMonitor):
     
     def ischanged(self):
         """Return true if the host doesn't match the LogicMonitor account"""
-        ignore = ['system.categories']
+        ignore = ['system.categories', 'snmp.version']
         hostresp = self._gethostbydisplayname(self.displayname) or self._gethostbyhostname(self.hostname)
         propresp = self.getproperties()
         if propresp and hostresp:
@@ -473,7 +506,7 @@ class Host(LogicMonitor):
                 #end if
             #end for
             
-            if set(p) != set(self.properties):
+            if p != self.properties:
                 return True
             #end if
         else:
@@ -482,15 +515,38 @@ class Host(LogicMonitor):
         return False
     #end ischanged
     
-    def getsdts(self):
-        """return list of scheduled down time (SDT) objects set on this host."""
-        pass
-    #end getsdts
-
-    def sdt(self, starttime, duration):
+    def sdt(self):
         """create a scheduled down time (maintenance window) for this host"""
-        pass
+        duration = self.duration
+        starttime = self.starttime
+        self.change = True
+        if self.module.check_mode:
+            self.module.exit_json(changed=True)
+        #end if
+        accountresp = json.loads(self.rpc("getCompanySettings", {}))
+        if accountresp["status"] == 200:
+            offset = accountresp["data"]["offset"]
+            if starttime:
+                start = datetime.strptime(starttime, '%Y-%m-%d %H:%M')
+            else:
+                start = datetime.utcnow()
+            #end if
+            offsetstart = start + timedelta(0, offset)
+            offsetend = offsetstart + timedelta(0, duration*60)
+            resp = json.loads(self.rpc("setHostSDT", {"hostId": self.info["id"], "type": 1, "notifyCC": True,
+            "year": offsetstart.year, "month": offsetstart.month - 1, "day": offsetstart.day, "hour": offsetstart.hour, "minute": offsetstart.minute,
+            "endYear": offsetend.year, "endMonth": offsetend.month- 1, "endDay": offsetend.day, "endHour": offsetend.hour, "endMinute": offsetend.minute,
+            }))
+            if resp["status"] == 200:
+                return resp["data"]
+            else:
+                return None
+            #end
+        else:
+            self.module.fail_json("Error: Unable to retrieve timezone offset")
+        #end if
     #end sdt
+
 
     ####################################
     #                                  #
@@ -667,10 +723,10 @@ def selector(module):
     
     if module.params['action'] == 'add':
         action = target.create
-    # elif module.params['action'] == 'remove':
-    #     action = remove
-    # elif module.params['action'] == 'sdt':
-    #     action = sdt
+    elif module.params['action'] == 'remove':
+        action = target.remove
+    elif module.params['action'] == 'sdt':
+        action = target.sdt
     else:
         module.fail_json(msg="Error: Something very strange happened. An unexpected action was specified.")
     #end if
@@ -714,6 +770,8 @@ def main():
             groups=dict(required=False, default=[]),
             fullpath=dict(required=False, default=None),
             alertenable=dict(required=False, default=True),
+            starttime=dict(required=False, default=None),
+            duration=dict(required=False, default=30),
         ),
         supports_check_mode=True
     )

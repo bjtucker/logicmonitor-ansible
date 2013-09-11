@@ -12,6 +12,8 @@
 import sys
 import json
 import os
+import datetime
+from datetime import datetime, time, tzinfo, timedelta
 from logicmonitor import LogicMonitor
 
 class Host(LogicMonitor):
@@ -154,16 +156,31 @@ class Host(LogicMonitor):
         return False
     #end ischanged
 
-
-    
-    def getsdts(self):
-        """return list of scheduled down time (SDT) objects set on this host."""
-        pass
-    #end getsdts
-
-    def sdt(self, starttime, duration):
+    def sdt(self, duration=30, starttime=None):
         """create a scheduled down time (maintenance window) for this host"""
-        pass
+        accountresp = json.loads(self.rpc("getCompanySettings", {}))
+        if accountresp["status"] == 200:
+            offset = accountresp["data"]["offset"]
+            if starttime:
+                start = datetime.strptime(starttime, '%Y-%m-%d %H:%M')
+            else:
+                start = datetime.utcnow()
+            #end if
+            offsetstart = start + timedelta(0, offset)
+            offsetend = offsetstart + timedelta(0, duration*60)
+            resp = json.loads(self.rpc("setHostSDT", {"hostId": self.info["id"], "type": 1, 
+            "year": offsetstart.year, "month": offsetstart.month, "day": offsetstart.day, "hour": offsetstart.hour, "minute": offsetstart.minute,
+            "endYear": offsetend.year, "endMonth": offsetend.month, "endDay": offsetend.day, "endHour": offsetend.hour, "endMinute": offsetend.minute,
+            }))
+            if resp["status"] == 200:
+                return resp["data"]
+            else:
+                return None
+            #end
+        else:
+            print "Error: Unable to retrieve list of hosts from server"
+            exit(resp["status"])
+        #end if
     #end sdt
 
     ####################################
@@ -193,7 +210,7 @@ class Host(LogicMonitor):
         if host_json["status"] == 200:
             return host_json["data"]
         else:
-            exit(resp["status"])
+            return None
         #end if
     #end gethostbydisplayname
 
