@@ -83,6 +83,107 @@ class LogicMonitor(object):
             self.module.fail_json(msg=resp)
         #end if
     #end getcollectors
+
+    def gethostbyhostname(self, hostname, collector):
+        hostlist_json = json.loads(self.rpc("getHosts", {"hostGroupId": 1}))
+        if collector is not None and hostlist_json["status"] == 200:
+            hosts = hostlist_json["data"]["hosts"]
+            for host in hosts:
+                if host["hostName"] == hostname and host["agentId"] == collector["id"]:
+                    return host
+                #end if
+            #end for
+            return None
+        else:
+           return None
+        #end if
+    #end gethostbyhostname
+
+    def gethostbydisplayname(self, displayname):
+        host_json = json.loads(self.rpc("getHost", {"displayName": displayname}))
+        if host_json["status"] == 200:
+            return host_json["data"]
+        else:
+           return None
+        #end if
+    #end gethostbydisplayname
+    
+    def getcollectorbydescription(self, description):
+        """return the collector json object for the collector with the matching FQDN (description) in your LogicMonitor account"""
+        collector_list = self.getcollectors()
+        if collector_list is not None:
+            for collector in collector_list:
+                if collector["description"] == description:
+                    return collector
+                #end if
+            #end for
+        #end if
+        return None
+    #end getcollectorbydescription
+    
+    def getgroup(self, fullpath):
+        """Return a JSON object with the current state of a group in your LogicMonitor account"""
+        resp = json.loads(self.rpc("getHostGroups", {}))
+        if resp["status"] == 200:
+            groups = resp["data"]
+            for group in groups:
+                if group["fullPath"] == fullpath.lstrip('/'):
+                    return group
+                #end if
+            #end for
+        else:
+           self.module.fail_json(msg="Error: Unable to retreive the list of host groups from the server.")
+        #end if
+        return None
+    #end getgroup
+    
+    def creategroup(self, fullpath):
+        """Recursively create a path of host groups. return value is the id of the newly created hostgroup in your LogicMonitor account"""
+        if self.getgroup(fullpath):
+            return self.getgroup(fullpath)["id"]
+        #end if
+        parentpath, name = fullpath.rsplit('/', 1)
+        parentgroup = self.getgroup(parentpath)
+        if fullpath == "/":
+            return 1
+        elif parentpath == "":
+            parentid = 1
+            self.change = True
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            #end if
+            resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": parentid, "alertEnable": True}))
+            if resp["status"] == 200:
+                return resp["data"]["id"]
+            else:
+               self.module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
+            #end if
+        elif parentgroup:
+            parentid = parentgroup["id"]
+            self.change = True
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            #end if
+            resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": parentid, "alertEnable": True}))
+            if resp["status"] == 200:
+                return resp["data"]["id"]
+            else:
+               self.module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
+            #end if
+        else:
+            self.change = True
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            #end if
+            resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": self.creategroup(parentpath), "alertEnable": True}))
+            if resp["status"] == 200:
+                return resp["data"]["id"]
+            else:
+               self.module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
+            #end if
+            
+        #end if
+    #end _createparentgroup
     
 #end Logicmonitor
 
@@ -345,7 +446,7 @@ class Host(LogicMonitor):
         """Initializor for the LogicMonitor host object"""
         LogicMonitor.__init__(self, module, **module.params)
         if self.module.params["collector"]:
-            self.collector   = self._getcollectorbydescription(self.module.params["collector"])
+            self.collector   = self.getcollectorbydescription(self.module.params["collector"])
         else:
             self.collector   = None
         #end if
@@ -359,7 +460,7 @@ class Host(LogicMonitor):
         else:
             self.displayname = self.fqdn
         #end if
-        self.info = self._gethostbydisplayname(self.displayname) or self._gethostbyhostname(self.hostname)
+        self.info = self.gethostbydisplayname(self.displayname) or self.gethostbyhostname(self.hostname, self.collector)
 #        if self.module.params["properties"].instanceof(str):
         self.properties  = self.module.params["properties"]
         self.groups      = self.module.params["groups"]
@@ -459,7 +560,7 @@ class Host(LogicMonitor):
     def ischanged(self):
         """Return true if the host doesn't match the LogicMonitor account"""
         ignore = ['system.categories', 'snmp.version']
-        hostresp = self._gethostbydisplayname(self.displayname) or self._gethostbyhostname(self.hostname)
+        hostresp = self.gethostbydisplayname(self.displayname) or self.gethostbyhostname(self.hostname)
         propresp = self.getproperties()
         if propresp and hostresp:
             if hostresp["alertEnable"] != self.alertenable:
@@ -483,7 +584,7 @@ class Host(LogicMonitor):
                 #end if
             #end for
             for group in self.groups:
-                groupjson = self._getgroup(group)
+                groupjson = self.getgroup(group)
                 if groupjson is None:
                     return True
                 elif groupjson['id'] not in g:
@@ -552,108 +653,7 @@ class Host(LogicMonitor):
     #                                  #
     #    internal utility methods      #
     #                                  #
-    ####################################    
-
-    def _gethostbyhostname(self, hostname):
-        hostlist_json = json.loads(self.rpc("getHosts", {"hostGroupId": 1}))
-        if hostlist_json["status"] == 200:
-            hosts = hostlist_json["data"]["hosts"]
-            for host in hosts:
-                if host["hostName"] == hostname and host["agentId"] == self.collector["id"]:
-                    return host
-                #end if
-            #end for
-            return None
-        else:
-           return None
-        #end if
-    #end gethostbyhostname
-
-    def _gethostbydisplayname(self, displayname):
-        host_json = json.loads(self.rpc("getHost", {"displayName": displayname}))
-        if host_json["status"] == 200:
-            return host_json["data"]
-        else:
-           return None
-        #end if
-    #end gethostbydisplayname
-    
-    def _getcollectorbydescription(self, description):
-        """return the collector json object for the collector with the matching FQDN (description) in your LogicMonitor account"""
-        collector_list = self.getcollectors()
-        if collector_list is not None:
-            for collector in collector_list:
-                if collector["description"] == description:
-                    return collector
-                #end if
-            #end for
-        #end if
-        return None
-    #end getcollectorbydescription
-    
-    def _getgroup(self, fullpath):
-        """Return a JSON object with the current state of a group in your LogicMonitor account"""
-        resp = json.loads(self.rpc("getHostGroups", {}))
-        if resp["status"] == 200:
-            groups = resp["data"]
-            for group in groups:
-                if group["fullPath"] == fullpath.lstrip('/'):
-                    return group
-                #end if
-            #end for
-        else:
-           self.module.fail_json(msg="Error: Unable to retreive the list of host groups from the server.")
-        #end if
-        return None
-    #end _getgroup
-    
-    def _creategroup(self, fullpath):
-        """Recursively create a path of host groups. return value is the id of the newly created hostgroup in your LogicMonitor account"""
-        if self._getgroup(fullpath):
-            return self._getgroup(fullpath)["id"]
-        #end if
-        parentpath, name = fullpath.rsplit('/', 1)
-        parentgroup = self._getgroup(parentpath)
-        if fullpath == "/":
-            return 1
-        elif parentpath == "":
-            parentid = 1
-            self.change = True
-            if self.module.check_mode:
-                self.module.exit_json(changed=True)
-            #end if
-            resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": parentid, "alertEnable": True}))
-            if resp["status"] == 200:
-                return resp["data"]["id"]
-            else:
-               self.module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
-            #end if
-        elif parentgroup:
-            parentid = parentgroup["id"]
-            self.change = True
-            if self.module.check_mode:
-                self.module.exit_json(changed=True)
-            #end if
-            resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": parentid, "alertEnable": True}))
-            if resp["status"] == 200:
-                return resp["data"]["id"]
-            else:
-               self.module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
-            #end if
-        else:
-            self.change = True
-            if self.module.check_mode:
-                self.module.exit_json(changed=True)
-            #end if
-            resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": self._creategroup(parentpath), "alertEnable": True}))
-            if resp["status"] == 200:
-                return resp["data"]["id"]
-            else:
-               self.module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
-            #end if
-            
-        #end if
-    #end _createparentgroup
+    ####################################
     
     def _buildhosthash(self, hostname, displayname, collector, description, groups, properties, alertenable):
         """Return a property formated hash for the creation of a host using the rpc function"""
@@ -671,12 +671,12 @@ class Host(LogicMonitor):
         if groups != []:
             groupids = ""
             for group in groups:
-                groupids = groupids + str(self._creategroup(group)) + ","
+                groupids = groupids + str(self.creategroup(group)) + ","
             #end for
             h["hostGroupIds"] = groupids.rstrip(',')
         #end if
         if properties != {}:
-            propnum = 0
+            propnum = 0        
             for key, value in properties.iteritems():
                 h["propName{0}".format(str(propnum))] = key
                 h["propValue{0}".format(str(propnum))] = value
@@ -748,16 +748,12 @@ def main():
     ACTIONS=[
         'add',
         'remove',
-        # 'install',   # possibly add for more granularity of collector management
-        # 'uninstall',
-        # 'start',
-        # 'stop',
         'sdt',
     ]
     
     module = AnsibleModule(
         argument_spec = dict(
-            target=dict(required=False, default=None, choices=TARGETS),
+            target=dict(required=True, default=None, choices=TARGETS),
             action=dict(required=True, default=None, choices=ACTIONS),
             company=dict(required=True, default=None),
             user=dict(required=True, default=None),
@@ -775,13 +771,8 @@ def main():
         ),
         supports_check_mode=True
     )
-
     selector(module)
-    # jsontest = json.loads(module.params["properties"])
-    # snmpcom = jsontest["snmp.community"]
-    # module.exit_json(changed=False, msg=snmpcom)
-#    module.exit_json(changed=False, msg=module.params["groups"])
-    #end if    
+    
 #end main
 
 # include magic from lib/ansible/module_common.py
