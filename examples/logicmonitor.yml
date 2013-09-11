@@ -13,26 +13,28 @@
   - name: Place LogicMonitor collectors into 30 minute Scheduled downtime
     logicmonitor: target=collector action=sdt company={{ company }} user={{ user }} password={{ password }}
   - name: Deploy LogicMonitor Host
-    logicmonitor:
-      target: host
-      action: add
-      collector: agent1.ethandev.com
-      company: '{{ company }}'
-      user: '{{ user }}'
-      password: '{{ password }}'
-      properties:
-        snmp.community: 'n3wc0mm'
-      groups:
-        - '/test/asdf'
-        - '/ans/ible'
+    local_action:
+      logicmonitor:
+        target: host
+        action: add
+        collector: agent1.ethandev.com
+        company: '{{ company }}'
+        user: '{{ user }}'
+        password: '{{ password }}'
+        properties:
+          snmp.community: 'n3wc0mm'
+        groups:
+          - '/test/asdf'
+          - '/ans/ible'
 
 - hosts: hosts
   user: root
   vars:
     company: 'youcompany'
     user: 'Luigi'
-    password: 'ImaLuigi,number1!'
-    digest: False
+#    password: 'ImaLuigi,number1!'
+    password: 'c82dbb33bef9e7382b9f39c2233a458b'
+    digest: True
   tasks:
   - name: deploy logicmonitor hosts
     logicmonitor:
