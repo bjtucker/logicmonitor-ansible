@@ -1,0 +1,58 @@
+---
+
+- hosts: collectors
+  user: root
+  vars:
+    company: 'yourcompany'
+    user: 'mario'
+    password: 'itsame.Mario!'
+    digest: False
+  tasks:
+  - name: Deploy/verify LogicMonitor collectors
+    logicmonitor: target=collector action=add company={{ company }} user={{ user }} password={{ password }}
+  - name: Place LogicMonitor collectors into 30 minute Scheduled downtime
+    logicmonitor: target=collector action=sdt company={{ company }} user={{ user }} password={{ password }}
+  - name: Deploy LogicMonitor Host
+    logicmonitor:
+      target: host
+      action: add
+      collector: agent1.ethandev.com
+      company: '{{ company }}'
+      user: '{{ user }}'
+      password: '{{ password }}'
+      properties:
+        snmp.community: 'n3wc0mm'
+      groups:
+        - '/test/asdf'
+        - '/ans/ible'
+
+- hosts: hosts
+  user: root
+  vars:
+    company: 'youcompany'
+    user: 'Luigi'
+    password: 'ImaLuigi,number1!'
+    digest: False
+  tasks:
+  - name: deploy logicmonitor hosts
+    logicmonitor:
+      target: host
+      action: add
+      collector: rock.ethandev.com
+      company: '{{ company }}'
+      user: '{{ user }}'
+      password: '{{ password }}'
+      properties:
+        snmp.community: 'newcomm'
+      groups:
+        - '/test/asdf'
+        - '/ans/ible'
+  - name: schedule 5 hour downtime for 2012-11-10 09:08
+    logicmonitor:
+      target: host
+      action: sdt
+      duration: 3000
+      starttime: '2012-11-10 09:08'
+      company: '{{ company }}'
+      user: '{{ user }}'
+      password: '{{ password }}'
