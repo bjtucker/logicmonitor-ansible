@@ -81,7 +81,7 @@ class LogicMonitor:
         #end if
     #end getcollectors
     
-    def _getgroup(self, fullpath):
+    def getgroup(self, fullpath):
         """Return a JSON object with the current state of a group in your LogicMonitor account"""
         resp = json.loads(self.rpc("getHostGroups", {}))
         if resp["status"] == 200:
@@ -93,20 +93,20 @@ class LogicMonitor:
             #end for
         #end if
         return None
-    #end _getgroup
+    #end getgroup
 
-    def _creategroup(self, fullpath):
+    def creategroup(self, fullpath):
         """Recursively create a path of host groups. return value is the id of the newly created hostgroup in your LogicMonitor account"""
-        if self._getgroup(fullpath):
+        if self.getgroup(fullpath):
             #group already exists
-            return self._getgroup(fullpath)["id"]
+            return self.getgroup(fullpath)["id"]
         #end if
         if fullpath == "/":
             #manage the global settings
             return 1
         #end if
         parentpath, name = fullpath.rsplit('/', 1)
-        parentgroup = self._getgroup(parentpath)
+        parentgroup = self.getgroup(parentpath)
         if parentpath == "":
             parentid = 1
             resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": parentid, "alertEnable": True}))
@@ -126,7 +126,7 @@ class LogicMonitor:
                 exit(resp["status"])
             #end if
         else:
-            resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": self._creategroup(parentpath), "alertEnable": True}))
+            resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": self.creategroup(parentpath), "alertEnable": True}))
             if resp["status"] == 200:
                 return resp["data"]["id"]
             else:
@@ -135,7 +135,7 @@ class LogicMonitor:
             #end if
             
         #end if
-    #end _creategroup
+    #end creategroup
     
     def gethostbyhostname(self, hostname, collector):
         hostlist_json = json.loads(self.rpc("getHosts", {"hostGroupId": 1}))

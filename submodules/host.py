@@ -123,7 +123,7 @@ class Host(LogicMonitor):
                 #end if
             #end for
             for group in self.groups:
-                groupjson = self._getgroup(group)
+                groupjson = self.getgroup(group)
                 if groupjson is None:
                     return True
                 elif groupjson['id'] not in g:
@@ -168,8 +168,8 @@ class Host(LogicMonitor):
             offsetstart = start + timedelta(0, offset)
             offsetend = offsetstart + timedelta(0, duration*60)
             resp = json.loads(self.rpc("setHostSDT", {"hostId": self.info["id"], "type": 1, 
-            "year": offsetstart.year, "month": offsetstart.month, "day": offsetstart.day, "hour": offsetstart.hour, "minute": offsetstart.minute,
-            "endYear": offsetend.year, "endMonth": offsetend.month, "endDay": offsetend.day, "endHour": offsetend.hour, "endMinute": offsetend.minute,
+            "year": offsetstart.year, "month": offsetstart.month-1, "day": offsetstart.day, "hour": offsetstart.hour, "minute": offsetstart.minute,
+            "endYear": offsetend.year, "endMonth": offsetend.month-1, "endDay": offsetend.day, "endHour": offsetend.hour, "endMinute": offsetend.minute,
             }))
             if resp["status"] == 200:
                 return resp["data"]
@@ -205,7 +205,7 @@ class Host(LogicMonitor):
         if groups != []:
             groupids = ""
             for group in groups:
-                groupids = groupids + str(self._creategroup(group)) + ","
+                groupids = groupids + str(self.creategroup(group)) + ","
             #end for
             h["hostGroupIds"] = groupids.rstrip(',')
         #end if
