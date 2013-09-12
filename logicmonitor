@@ -355,6 +355,10 @@ class Collector(LogicMonitor):
     #end stop
     
     def sdt(self):
+        self.change = True #set change flag to show that something was update
+        if self.module.check_mode:
+            self.module.exit_json(changed=True)
+        #end if
         duration = self.duration
         starttime = self.starttime
         """create a scheduled down time (maintenance window) for this host"""
@@ -461,7 +465,6 @@ class Host(LogicMonitor):
             self.displayname = self.fqdn
         #end if
         self.info = self.gethostbydisplayname(self.displayname) or self.gethostbyhostname(self.hostname, self.collector)
-#        if self.module.params["properties"].instanceof(str):
         self.properties  = self.module.params["properties"]
         self.groups      = self.module.params["groups"]
         self.description = self.module.params["description"]
@@ -706,6 +709,241 @@ class Host(LogicMonitor):
     
 #end class lm_host
 
+class Hostgroup(LogicMonitor):
+    
+    def __init__(self, module):
+        """Initializor for the LogicMonitor host object"""
+        LogicMonitor.__init__(self, module, **module.params)
+        self.fullpath = self.module.params["fullpath"]
+        self.info = self.getgroup(self.fullpath)
+        self.properties  = self.module.params["properties"]
+        self.description = self.module.params["description"]
+        self.alertenable = self.module.params["alertenable"]
+        self.starttime    = self.module.params["starttime"]
+        self.duration    = self.module.params["duration"]
+        self.change = False
+    #end __init__
+    
+    ####################################
+    #                                  #
+    #    Public methods                #
+    #                                  #
+    ####################################    
+
+    def getproperties(self):
+        """Returns a hash of the properties associated with this LogicMonitor host"""
+        if self.info:
+            properties_json = json.loads(self.rpc("getHostGroupProperties", {'hostGroupId': self.info["id"], "finalResult": False}))
+            if properties_json["status"] == 200:
+                return properties_json["data"]
+            else:
+                print "Error: there was an issue retrieving the host properties"
+                print json.dumps(properties_json)
+                exit(properties_json["status"])
+            #end if
+        else:
+            #print "Unable to find LogicMonitor host which matches {0} ({1})".format(self.displayname, self.hostname) 
+            return None
+        #end
+    #end getproperties
+
+    def setproperties(self, propertyhash):
+        """update the host to have the properties contained in the property hash"""
+        self.properties = propertyhash
+        self.change = True
+        if self.module.check_mode:
+            self.module.exit_json(changed=True)
+        #end if
+    #end setproperties
+    
+    def add(self):
+        """Idempotent function to ensure that the host group exists in your LogicMonitor account"""
+        if self.info == None:
+            self.change = True
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            #end if
+            hgid = self.creategroup(self.fullpath)
+            self.info = self.getgroup(self.fullpath)
+            return self.info
+        #end if
+    #end add
+    
+    def update(self):
+        """Idempotent function to ensure the host group settings (alertenable, properties, etc) in the LogicMonitor account match the current object."""
+        if self.fullpath == "/":
+            if self.ischanged():
+                h =  self._buildhostgrouphash( self.fullpath, self.description, self.properties, self.alertenable)
+                resp = json.loads(self.rpc("updateHostGroup", h))
+                if resp["status"] == 200:
+                    return resp["data"]
+                else:
+                    print "Error: unable to update the host."
+                    exit(resp["status"])
+                #end if
+            #end if
+        elif self.info:
+            if self.ischanged():
+                self.change = True
+                if self.module.check_mode:
+                    self.module.exit_json(changed=True)
+                #end if
+                h =  self._buildhostgrouphash( self.fullpath, self.description, self.properties, self.alertenable)
+                h["id"] = self.info["id"]
+                resp = json.loads(self.rpc("updateHostGroup", h))
+                if resp["status"] == 200:
+                    return resp["data"]
+                else:
+                    self.module.fail_json(msg="Error: Unable to update the host.\n{0}".format(json.dumps(resp)))
+                #end if
+            else:
+                return self.info
+            #end if
+        else:
+            self.change = True
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            #end if
+            return self.add()
+        #end if
+    #end update
+        
+    def remove(self):
+        """Idempotent function to ensure the host group does not exist in your LogicMonitor account"""
+        if self.info:
+            self.change = True
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            #end if
+            resp = json.loads(self.rpc("deleteHostGroup", {"hgId": self.info["id"]}))
+        #end if
+    #end if
+    
+    def ischanged(self):
+        """Return true if the host doesn't match the LogicMonitor account"""
+        ignore = []
+        group = self.getgroup(self.fullpath)
+        properties = self.getproperties()
+        if properties is not None and group is not None:
+            if group["alertEnable"] != self.alertenable:
+                return True
+            #end if
+            if group["description"] != self.description:
+                return True
+            #end if
+            p = {}
+            for prop in properties:
+                if prop["name"] not in ignore:
+                    if "*******" in prop["value"] and self._verifyproperty(prop["name"]):
+                        p[prop["name"]] = self.properties[prop["name"]]
+                    else:
+                        p[prop["name"]] = prop["value"]
+                    #end if
+                #end if
+            #end for
+            
+            if set(p) != set(self.properties):
+                return True
+            #end if
+        #end if
+        return False
+    #end ischanged
+    
+    
+    def sdt(self, duration=30, starttime=None):
+        """create a scheduled down time (maintenance window) for this host"""
+        self.change = True
+        if self.module.check_mode:
+            self.module.exit_json(changed=True)
+        #end if
+        accountresp = json.loads(self.rpc("getCompanySettings", {}))
+        if accountresp["status"] == 200:
+            offset = accountresp["data"]["offset"]
+            if starttime:
+                start = datetime.strptime(starttime, '%Y-%m-%d %H:%M')
+            else:
+                start = datetime.utcnow()
+            #end if
+            offsetstart = start + timedelta(0, offset)
+            offsetend = offsetstart + timedelta(0, duration*60)
+            resp = json.loads(self.rpc("setHostGroupSDT", {"hostGroupId": self.info["id"], "type": 1, "dataSourceId": 0,
+            "year": offsetstart.year, "month": offsetstart.month-1, "day": offsetstart.day, "hour": offsetstart.hour, "minute": offsetstart.minute,
+            "endYear": offsetend.year, "endMonth": offsetend.month-1, "endDay": offsetend.day, "endHour": offsetend.hour, "endMinute": offsetend.minute,
+            }))
+            if resp["status"] == 200:
+                return resp["data"]
+            else:
+                return None
+            #end
+        else:
+            self.module.fail_json(msg="Error: Unable to retrieve timezone from server")
+        #end if
+    #end sdt
+
+    def create(self):
+        """Wrapper for self.update()"""
+        self.update()
+    #end create
+
+    ####################################
+    #                                  #
+    #    internal utility methods      #
+    #                                  #
+    ####################################
+    
+    def _buildhostgrouphash(self, fullpath, description, properties, alertenable):
+        """Return a property formated hash for the creation of a hostgroup using the rpc function"""
+        h = {}
+        if fullpath == "/":
+            h["id"] = 1
+        else:
+            parentpath, name = fullpath.rsplit('/', 1)
+            parent = self.getgroup(parentpath)
+            if parent:
+                h["parentID"] = parent["id"]
+            else:
+                h["parentID"] = 1
+            #end if
+            h["name"] = name
+        #end if
+        if description:
+            h["description"] = description
+        #end if
+        if properties != {}:
+            propnum = 0
+            for key, value in properties.iteritems():
+                h["propName{0}".format(str(propnum))] = key
+                h["propValue{0}".format(str(propnum))] = value
+                propnum = propnum + 1
+            #end for
+        #end if
+        h["alertEnable"] = alertenable
+        return h
+    #end _buildhosthash
+    
+
+    def _verifyproperty(self, propname):
+        """Check with LogicMonitor server to verify property is unchanged"""
+        if self.info:
+            if propname not in self.properties:
+                return False
+            else:
+                resp = json.loads(self.rpc('verifyProperties', {"hostGroupId": self.info["id"], "propName0": propname, "propValue0": self.properties[propname]}))
+                if resp["status"] == 200:
+                    return resp["data"]["match"]
+                else:
+                    self.module.fail_json(msg="Error: unable to get verification from server.")
+                #end if
+            #end if
+        else:
+            self.module.fail_json(msg="Error: Can not verify properties of a hostgroup which doesn't exist")
+        #end if
+    #end _verifyproperty
+    
+
+#end Class Hostgroup
+
+
 #========================================
 
 def selector(module):
@@ -715,8 +953,7 @@ def selector(module):
     elif module.params['target'] == 'host':
         target = Host(module)
     elif module.params['target'] == 'hostgroup':
-        #target = Hostgroup(module)
-        pass
+        target = Hostgroup(module)
     else: #handles the EOTW case
         module.fail_json(msg="Error: Something very strange happened. An unexpected target was specified.")
     #end

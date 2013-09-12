@@ -158,7 +158,7 @@ class Hostgroup(LogicMonitor):
                 return None
             #end
         else:
-            print "Error: Unable to retrieve list of hosts from server"
+            print "Error: Unable to retrieve timezone from server"
             exit(resp["status"])
         #end if
     #end sdt
