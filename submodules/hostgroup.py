@@ -96,7 +96,13 @@ class Hostgroup(LogicMonitor):
         
     def remove(self):
         """Idempotent function to ensure the host group does not exist in your LogicMonitor account"""
-        pass
+        if self.info:
+            self.change = True
+            if self.module.check_mode:
+                self.module.exit_json(changed=True)
+            #end if
+            resp = json.loads(self.rpc("deleteHostGroup", {"hgId": self.info["id"]}))
+        #end if
     #end if
     
     def ischanged(self):
@@ -213,4 +219,4 @@ class Hostgroup(LogicMonitor):
     #end _verifyproperty
     
 
-#end Class Host
+#end Class Hostgroup
