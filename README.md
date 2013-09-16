@@ -144,7 +144,7 @@ options:
 
 Examples
 #example of adding a new LogicMonitor collector to these devices
-'''
+```
 ---
 
 - hosts: collectors
@@ -157,10 +157,10 @@ Examples
   tasks:
   - name: Deploy/verify LogicMonitor collectors
     logicmonitor: target=collector action=add company={{ company }} user={{ user }} password={{ password }}
-'''
+```
 
 #example of adding a host into monitoring
-'''
+```
 ---
 - hosts: collectors
   user: root
@@ -184,10 +184,10 @@ Examples
         groups:
           - '/test/asdf'
           - '/ans/ible'
-'''
+```
 
 #sdt a host
-'''
+```
 - hosts: hosts
   user: root
   vars:
@@ -206,10 +206,10 @@ Examples
       company: '{{ company }}'
       user: '{{ user }}'
       password: '{{ password }}'
-'''
+```
 
 #example of creating a hostgroup
-'''
+```
 - hosts: somemachine.superheroes.com
   user: root
   vars:
@@ -228,10 +228,10 @@ Examples
       password: '{{ password }}'
       properties:
         snmp.community: 'n3wc0mm'
-''''
+```'
 
 #example of putting a hostgroup in SDT
-'''
+```
 - hosts: somemachine.superheroes.com
   user: root
   vars:
@@ -250,10 +250,10 @@ Examples
       company: '{{ company }}'
       user: '{{ user }}'
       password: '{{ password }}'
-'''
+```
 
 #complete example
-'''
+```
 ---
 - hosts: somemachine.superheroes.com
   user: root
@@ -343,4 +343,4 @@ Examples
       user: '{{ user }}'
       password: '{{ password }}'
 
-'''
+```
