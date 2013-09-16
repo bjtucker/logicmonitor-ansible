@@ -3,6 +3,8 @@ logicmonitor-ansible
 
 Ansible module to allow control of your LogicMonitor account via Ansible PlayBooks.
 
+#Ansible Module Specifications
+```
 ---
 module: logicmonitor
 short_description: Manage your LogicMonitor account through Ansible Playbooks
@@ -141,6 +143,7 @@ options:
         default: 30
         choices: null
         version_added: "1.0"
+```
 
 Examples
 #example of adding a new LogicMonitor collector to these devices
