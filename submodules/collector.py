@@ -24,7 +24,7 @@ class Collector(LogicMonitor):
         
     def __init__(self, description=None, installdir="/usr/local/logicmonitor", credentials_file="/tmp/lm_credentials.txt"):
         """Initializor for the LogicMonitor Collector object"""
-        LogicMonitor.__init__(self, credentials_file)
+        LogicMonitor.__init__(self, company, user, password, digest)
         self.description = description or self.fqdn
         self.info = self._get()
         if self.info:

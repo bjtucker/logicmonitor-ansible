@@ -20,7 +20,7 @@ class Host(LogicMonitor):
     
     def __init__(self, collector, hostname=None, displayname=None, description=None, properties={}, groups=[], alertenable=True, credentials_file="/tmp/lm_credentials.txt"):
         """Initializor for the LogicMonitor host object"""
-        LogicMonitor.__init__(self, credentials_file)
+        LogicMonitor.__init__(self, company, user, password, digest)
         self.collector = self.getcollectorbydescription(collector)
         self.hostname = hostname or self.fqdn
         self.displayname = displayname or self.fqdn

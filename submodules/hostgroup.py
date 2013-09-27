@@ -22,7 +22,7 @@ class Hostgroup(LogicMonitor):
     
     def __init__(self, fullpath, description=None, properties={}, alertenable=True, credentials_file="/tmp/lm_credentials.txt"):
         """Initializor for the LogicMonitor host object"""
-        LogicMonitor.__init__(self, credentials_file)
+        LogicMonitor.__init__(self, company, user, password, digest)
         self.fullpath = fullpath
         self.info = self.getgroup(self.fullpath)
         self.properties = properties
