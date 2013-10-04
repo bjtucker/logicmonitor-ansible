@@ -182,11 +182,9 @@ Examples
         company: '{{ company }}'
         user: '{{ user }}'
         password: '{{ password }}'
-        properties:
-          snmp.community: 'n3wc0mm'
-        groups:
-          - '/test/asdf'
-          - '/ans/ible'
+        properties: {snmp.community: 'commstring'}
+        groups: ['/test/asdf', '/ans/ible']
+
 ```
 
 #sdt a host
@@ -229,8 +227,8 @@ Examples
       company: '{{ company }}'
       user: '{{ user }}'
       password: '{{ password }}'
-      properties:
-        snmp.community: 'n3wc0mm'
+      properties: {snmp.community: 'commstring'}
+
 ```'
 
 #example of putting a hostgroup in SDT
@@ -274,8 +272,7 @@ Examples
       company: '{{ company }}'
       user: '{{ user }}'
       password: '{{ password }}'
-      properties:
-        snmp.community: 'n3wc0mm'
+      properties: {snmp.community: 'commstring'}
   - name: SDT a host group
     logicmonitor:
       target: hostgroup
@@ -308,11 +305,8 @@ Examples
         company: '{{ company }}'
         user: '{{ user }}'
         password: '{{ password }}'
-        properties:
-          snmp.community: 'n3wc0mm'
-        groups:
-          - '/test/asdf'
-          - '/ans/ible'
+        properties: {snmp.community: 'commstring'}
+        groups: ['/test/asdf', '/ans/ible']
 
 - hosts: hosts
   user: root
@@ -331,11 +325,8 @@ Examples
       company: '{{ company }}'
       user: '{{ user }}'
       password: '{{ password }}'
-      properties:
-        snmp.community: 'newcomm'
-      groups:
-        - '/test/asdf'
-        - '/ans/ible'
+      properties: {snmp.community: 'commstring'}
+      groups: ['/test/asdf', '/ans/ible']
   - name: schedule 5 hour downtime for 2012-11-10 09:08
     logicmonitor:
       target: host
