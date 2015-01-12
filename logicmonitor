@@ -41,18 +41,11 @@ options:
         choices: null
     password:
         description:
-            - The password or md5 hash of the password for the chosen LogicMonitor User
+            - The password for the chosen LogicMonitor User
             - If an md5 hash is used, the digest flag must be set to true
         required: true
         default: null
         choices: null
-    digest:
-        description:
-            - Boolean flag to tell the module to treat the password as plaintext or md5 digest
-            - If an md5 hash is used, the digest flag must be set to true
-        required: false
-        default: false
-        choices: [true, false]
     collector:
         description:
             - The fully qualified domain name of a collector in your LogicMonitor account.
@@ -209,20 +202,13 @@ class LogicMonitor(object):
         self.company                = kwargs["company"]
         self.user                   = kwargs["user"]
         self.password               = kwargs["password"]
-        self.digest                 = module.boolean(kwargs['digest'])
-        if self.digest:
-            self.password_digest    = self.password
-        else:
-            m = hashlib.md5()
-            m.update(self.password)
-            self.password_digest    = m.hexdigest()
-        self.fqdn           = socket.getfqdn()
+        self.fqdn                   = socket.getfqdn()
 
 
     def rpc(self, action, params):
         """Make a call to the LogicMonitor RPC library and return the response"""
         param_str = urllib.urlencode(params)
-        creds = urllib.urlencode({"c": self.company, "u": self.user, "pmd5": self.password_digest})
+        creds = urllib.urlencode({"c": self.company, "u": self.user, "p": self.password})
         if param_str:
             param_str = param_str + "&"
         param_str = param_str + creds
@@ -475,7 +461,7 @@ class Collector(LogicMonitor):
         duration = self.duration
         starttime = self.starttime
         """create a scheduled down time (maintenance window) for this host"""
-        accountresp = json.loads(self.rpc("getCompanySettings", {}))
+        accountresp = json.loads(self.rpc("getTimeZoneSetting", {}))
         if accountresp["status"] == 200:
             offset = accountresp["data"]["offset"]
             if starttime:
@@ -631,7 +617,7 @@ class Host(LogicMonitor):
     def is_changed(self):
         """Return true if the host doesn't match the LogicMonitor account"""
         ignore = ['system.categories', 'snmp.version']
-        hostresp = self.get_host_by_displayname(self.displayname) or self.get_host_by_hostname(self.hostname)
+        hostresp = self.get_host_by_displayname(self.displayname) or self.get_host_by_hostname(self.hostname, self.collector)
         propresp = self.get_properties()
         if propresp and hostresp:
             if hostresp["alertEnable"] != self.alertenable or hostresp["description"] != self.description or hostresp["displayedAs"] != self.displayname or hostresp["agentId"] != self.collector["id"]:
@@ -674,7 +660,7 @@ class Host(LogicMonitor):
         self.change = True
         if self.module.check_mode:
             self.module.exit_json(changed=True)
-        accountresp = json.loads(self.rpc("getCompanySettings", {}))
+        accountresp = json.loads(self.rpc("getTimeZoneSetting", {}))
         if accountresp["status"] == 200:
             offset = accountresp["data"]["offset"]
             if starttime:
@@ -845,7 +831,7 @@ class Hostgroup(LogicMonitor):
         self.change = True
         if self.module.check_mode:
             self.module.exit_json(changed=True)
-        accountresp = json.loads(self.rpc("getCompanySettings", {}))
+        accountresp = json.loads(self.rpc("getTimeZoneSetting", {}))
         if accountresp["status"] == 200:
             offset = accountresp["data"]["offset"]
             if starttime:
@@ -956,7 +942,6 @@ def main():
             company=dict(required=True, default=None),
             user=dict(required=True, default=None),
             password=dict(required=True, default=None),
-            digest=dict(required=False, default=False, choices=BOOLEANS),
             collector=dict(required=False, default=None),
             hostname=dict(required=False, default=None),
             displayname=dict(required=False, default=None),
