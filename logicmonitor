@@ -445,10 +445,20 @@ class Collector(LogicMonitor):
             a = Popen(["service", "logicmonitor-agent", "status"], stdout=subprocess.PIPE)
             (aoutput, aerror) = a.communicate()
             if "is running" in aoutput:
+                self.change = True
+
+                if self.module.check_mode:
+                    self.module.exit_json(changed=True)
+
                 call(["service", "logicmonitor-agent", "stop"])
             w = Popen(["service", "logicmonitor-watchdog", "status"], stdout=subprocess.PIPE)
             (woutput, werror) = w.communicate()
             if "is running" in woutput:
+                self.change = True
+
+                if self.module.check_mode:
+                    self.module.exit_json(changed=True)
+                    
                 call(["service", "logicmonitor-watchdog", "stop"])
         else:
             self.module.fail_json(msg="Error: LogicMonitor Collector must be installed on a Linux device.")
