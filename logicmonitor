@@ -290,29 +290,17 @@ class LogicMonitor(object):
         parentgroup = self.get_group(parentpath)
         if fullpath == "/":
             return 1
-        elif parentpath == "":
-            parentid = 1
-            self.change = True
-            if self.module.check_mode:
-                self.module.exit_json(changed=True)
-            resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": parentid, "alertEnable": True}))
-            if resp["status"] == 200:
-                return resp["data"]["id"]
-            else:
-               self.module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
-        elif parentgroup:
-            parentid = parentgroup["id"]
-            self.change = True
-            if self.module.check_mode:
-                self.module.exit_json(changed=True)
-            #end if
-            resp = json.loads(self.rpc("addHostGroup", {"name": name, "parentId": parentid, "alertEnable": True}))
-            if resp["status"] == 200:
-                return resp["data"]["id"]
-            else:
-               self.module.fail_json(msg="Error: unable to create new hostgroup.\n%s" % resp["errmsg"])
         else:
             self.change = True
+            parentid = 1
+
+            if parentpath == "":
+                parentid = 1
+            elif parentgroup:
+                parentid = parentgroup["id"]
+            else:
+                parentid = self.create_group(parentpath)
+
             if self.module.check_mode:
                 self.module.exit_json(changed=True)
             #end if
