@@ -43,7 +43,7 @@ options:
     user:
         description:
             - A LogicMonitor user name. The module will authenticate and perform actions on behalf of this user
-        required: true 
+        required: true
         default: null
         choices: null
         version_added: "1.0"
@@ -115,7 +115,7 @@ options:
         description:
             - The fullpath of the hostgroup object you would like to manage
             - Recommend running on a single ansible host
-            - Required for management of LogicMonitor host groups (target=hostgroup) 
+            - Required for management of LogicMonitor host groups (target=hostgroup)
         required: false
         default: null
         choices: null
@@ -229,7 +229,7 @@ Examples
       password: '{{ password }}'
       properties: {snmp.community: 'commstring'}
 
-```'
+```
 
 #example of putting a hostgroup in SDT
 ```
@@ -283,7 +283,7 @@ Examples
       company: '{{ company }}'
       user: '{{ user }}'
       password: '{{ password }}'
-      
+
 - hosts: collectors
   user: root
   vars:
