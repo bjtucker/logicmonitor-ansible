@@ -13,7 +13,7 @@ description:
       infrastructure monitoring platform.
     - This module manages hosts, host groups, and collectors within your
       LogicMonitor account.
-version_added: "1.1"
+version_added: "2.1"
 author: Ethan Culler-Mayeno, Jeff Wozniak
 notes: You must have an existing LogicMonitor account for this module to      
        function.
