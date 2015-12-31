@@ -816,7 +816,6 @@ class LogicMonitor(object):
             self.module.fail_json(msg=msg, changed=self.change)
         except:
             print(msg)
-            sys.exit(1)
 
     def exit(self, changed):
         logging.debug("Changed: {0}".format(changed))
@@ -826,7 +825,6 @@ class LogicMonitor(object):
             self.module.exit_json(changed=changed)
         except:
             print("Changed: {0}".format(changed))
-            sys.exit(0)
 
     def output_info(self, info):
         try:
