@@ -579,10 +579,10 @@ class LogicMonitor(object):
         logging.debug("Running LogicMonitor.rpc")
 
         param_str = urllib.urlencode(params)
-        creds = (urllib.urlencode(
+        creds = urllib.urlencode(
             {"c": self.company,
                 "u": self.user,
-                "p": self.password}))
+                "p": self.password})
 
         if param_str:
             param_str = param_str + "&"
@@ -590,16 +590,15 @@ class LogicMonitor(object):
         param_str = param_str + creds
 
         try:
-            f = (self.urlopen(
+            f = self.urlopen(
                 "https://{0}.logicmonitor.com/santaba/rpc/{1}?{2}"
-                .format(self.company, action, param_str)))
+                .format(self.company, action, param_str))
 
             raw = f.read()
             resp = json.loads(raw)
             if resp["status"] == 403:
                 logging.debug("Authentication failed.")
-                self.fail(
-                    msg="Error: {0}".format(resp["errmsg"]))
+                self.fail(msg="Error: {0}".format(resp["errmsg"]))
             else:
                 return raw
 
@@ -626,9 +625,9 @@ class LogicMonitor(object):
             logging.debug("Attempting to open URL: " +
                           "https://{0}.logicmonitor.com/santaba/do/{1}?{2}"
                           .format(self.company, action, param_str))
-            f = (self.urlopen(
+            f = self.urlopen(
                 "https://{0}.logicmonitor.com/santaba/do/{1}?{2}"
-                .format(self.company, action, param_str)))
+                .format(self.company, action, param_str))
             return f.read()
 
         except IOError as ioe:
@@ -1015,15 +1014,15 @@ class Collector(LogicMonitor):
                 return installfilepath
 
         elif self.id is None:
-            (self.fail(
+            self.fail(
                 msg="Error: There is currently no collector " +
                     "associated with this device. To download " +
                     " the installer, first create a collector " +
-                    "for this device."))
+                    "for this device.")
         elif self.platform != "Linux":
-            (self.fail(
+            self.fail(
                 msg="Error: LogicMonitor Collector must be " +
-                "installed on a Linux device."))
+                "installed on a Linux device.")
         else:
             self.fail(
                 msg="Error: Unable  to retrieve the installer from the server")
@@ -2229,7 +2228,6 @@ class Hostgroup(LogicMonitor):
         else:
             self.fail(
                 msg="Error: Group doesn't exist. Unable to verify properties")
-
 
 
 def selector(module):
