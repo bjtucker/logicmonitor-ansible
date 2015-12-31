@@ -274,7 +274,7 @@ EXAMPLES = '''
             user='{{ user }}'
             password='{{ password }}'
             groups="/servers/production,/datacenter1"
-            properties="{'snmp.community':'commstring','dc':'1', 'type':'prod'}"
+            properties="{'snmp.community':'secret','dc':'1', 'type':'prod'}"
 
     #example of creating a hostgroup
     ---
@@ -382,7 +382,7 @@ EXAMPLES = '''
             company='{{ company }}'
             user='{{ user }}'
             password='{{ password }}'
-            properties="{'snmp.community':'newcomm', 'type':'dev', 'status':'test'}"
+            properties="{'snmp.community':'hg', 'type':'dev', 'status':'test'}"
 
     #example of removing a list of hosts from monitoring
     ---
