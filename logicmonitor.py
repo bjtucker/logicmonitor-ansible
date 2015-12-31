@@ -42,7 +42,7 @@ description:
     - >
         This module manages hosts, host groups, and collectors within your
         LogicMonitor account.
-version_added: "1.1"
+version_added: "2.1"
 author: Ethan Culler-Mayeno, Jeff Wozniak
 notes: >
     You must have an existing LogicMonitor account for this module to function.
@@ -71,7 +71,7 @@ options:
         required: true
         default: null
         choices: ['collector', 'host', 'hostgroup']
-        version_added: "1.0"
+        version_added: "2.1"
     action:
         description:
             - The action you wish to perform on target
@@ -86,7 +86,7 @@ options:
         required: true
         default: null
         choices: ['add', 'remove', 'update', 'sdt']
-        version_added: "1.0"
+        version_added: "2.1"
     company:
         description:
             - >
@@ -96,7 +96,7 @@ options:
         required: true
         default: null
         choices: null
-        version_added: "1.0"
+        version_added: "2.1"
     user:
         description:
             - >
@@ -105,14 +105,14 @@ options:
         required: true
         default: null
         choices: null
-        version_added: "1.0"
+        version_added: "2.1"
     password:
         description:
             - The password of the specified LogicMonitor user
         required: true
         default: null
         choices: null
-        version_added: "1.0"
+        version_added: "2.1"
     collector:
         description:
             - >
@@ -128,7 +128,7 @@ options:
         required: false
         default: null
         choices: null
-        version_added: "1.0"
+        version_added: "2.1"
     hostname:
         description:
             - >
@@ -138,7 +138,7 @@ options:
         required: false
         default: 'hostname -f'
         choices: null
-        version_added: "1.0"
+        version_added: "2.1"
     displayname:
         description:
             - >
@@ -148,7 +148,7 @@ options:
         required: false
         default: 'hostname -f'
         choices: null
-        version_added: "1.0"
+        version_added: "2.1"
     description:
         description:
             - >
@@ -160,7 +160,7 @@ options:
         required: false
         default: ""
         choices: null
-        version_added: "1.0"
+        version_added: "2.1"
     properties:
         description:
             - >
@@ -175,7 +175,7 @@ options:
         required: false
         default: {}
         choices: null
-        version_added: "1.0"
+        version_added: "2.1"
     groups:
         description:
             - A list of groups that the host should be a member of.
@@ -185,7 +185,7 @@ options:
         required: false
         default: []
         choices: null
-        version_added: "1.0"
+        version_added: "2.1"
     fullpath:
         description:
             - The fullpath of the host group object you would like to manage
@@ -196,7 +196,7 @@ options:
         required: false
         default: null
         choices: null
-        version_added: "1.0"
+        version_added: "2.1"
     alertenable:
         description:
             - A boolean flag to turn alerting on or off for an object
@@ -204,7 +204,7 @@ options:
         required: false
         default: true
         choices: [true, false]
-        version_added: "1.0"
+        version_added: "2.1"
     starttime:
         description:
             - The time that the Scheduled Down Time (SDT) should begin
@@ -213,7 +213,7 @@ options:
         required: false
         default: Now
         choices: null
-        version_added: "1.0"
+        version_added: "2.1"
     duration:
         description:
             - The duration (minutes) of the Scheduled Down Time (SDT)
@@ -221,7 +221,7 @@ options:
         required: false
         default: 30
         choices: null
-        version_added: "1.0"
+        version_added: "2.1"
 ...
 '''
 EXAMPLES = '''
@@ -2271,9 +2271,6 @@ def selector(module):
     action()
     module.exit_json(changed=target.change)
 
-from ansible.module_utils.basic import *
-from ansible.module_utils.urls import *
-
 
 def main():
     if HAS_LIB is not True:
@@ -2313,6 +2310,10 @@ def main():
     )
 
     selector(module)
+
+
+from ansible.module_utils.basic import *
+from ansible.module_utils.urls import *
 
 
 if __name__ == "__main__":
