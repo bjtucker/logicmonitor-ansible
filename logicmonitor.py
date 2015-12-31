@@ -566,6 +566,8 @@ EXAMPLES = '''
 class LogicMonitor(object):
 
     def __init__(self, module, **params):
+        self.__version__ = "1.0-python"
+
         logging.basicConfig(level=logging.DEBUG)
         logging.debug("Instantiating LogicMonitor object")
 
@@ -580,6 +582,7 @@ class LogicMonitor(object):
         try:
             self.module = module
             self.urlopen = open_url  # use the ansible provided open_url
+            self.__version__ = self.__version__ + "-ansible-module"
         except:
             self.module = None
             self.urlopen = urllib.urlopen
@@ -603,6 +606,17 @@ class LogicMonitor(object):
         try:
             url = ("https://{0}.{1}/rpc/{2}?{3}"
                    .format(self.company, self.lm_url, action, param_str))
+
+            # Set custom LogicMonitor header with version
+            headers = {"X-LM-User-Agent": self.__version__}
+
+            # Set headers dependent on Ansible or normal usage
+            if self.module is not None:
+                f = self.urlopen(url, headers=headers)
+            else:
+                req = urllib2.Request(url)
+                req.add_header("X-LM-User-Agent", self.__version__)
+                f = self.urlopen(req)
 
             raw = f.read()
             resp = json.loads(raw)
