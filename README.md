@@ -3,6 +3,18 @@
 Ansible module to allow control of your LogicMonitor account via
 Ansible PlayBooks.
 
+### Installation
+To install this module, place it the configured Ansible library directory.
+This directory can be configured by editing ansible.cfg and setting
+```
+library = [path/to/library/folder]
+```
+This directory can also be configured by setting the ANSIBLE_LIBRARY
+environment variable.
+```
+export ANSIBLE_LIBRARY=~/ansible-modules-core:~/ansible-modules-extras[path/to/library/folder]
+```
+
 ### Ansible Module Specifications
 
 ```
