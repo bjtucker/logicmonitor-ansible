@@ -81,7 +81,7 @@ options:
                 or set 'become: yes' for the task.
         required: true
         default: null
-        choices: ['collector', 'host', 'hostgroup']
+        choices: ['collector', 'host', 'datsource', 'hostgroup']
         version_added: "2.1"
     action:
         description:
@@ -197,6 +197,16 @@ options:
         default: []
         choices: null
         version_added: "2.1"
+    id:
+        description:
+            - ID of the datasource to target
+            - >
+                Required for management of LogicMonitor datasources
+                (target=datasource)
+            required: false
+            default: null
+            choices: null
+            version_added: "2.1"
     fullpath:
         description:
             - The fullpath of the host group object you would like to manage
@@ -276,6 +286,28 @@ EXAMPLES = '''
             password='{{ password }}'
             groups="/servers/production,/datacenter1"
             properties="{'snmp.community':'secret','dc':'1', 'type':'prod'}"
+
+    #example of putting a datasource in SDT
+    ---
+    - hosts: localhost
+      remote_user: '{{ username }}'
+      vars:
+        company: 'mycompany'
+        user: 'myusername'
+        password: 'mypassword'
+      tasks:
+      - name: SDT a datasource
+        # All tasks except for target=collector should use local_action
+        local_action: >
+            logicmonitor
+            target=datasource
+            action=sdt
+            id='123'
+            duration=3000
+            starttime='2017-03-04 05:06'
+            company='{{ company }}'
+            user='{{ user }}'
+            password='{{ password }}'
 
     #example of creating a hostgroup
     ---
