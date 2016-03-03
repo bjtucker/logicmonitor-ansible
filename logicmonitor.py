@@ -203,10 +203,10 @@ options:
             - >
                 Required for management of LogicMonitor datasources
                 (target=datasource)
-            required: false
-            default: null
-            choices: null
-            version_added: "2.1"
+        required: false
+        default: null
+        choices: null
+        version_added: "2.1"
     fullpath:
         description:
             - The fullpath of the host group object you would like to manage
@@ -1885,8 +1885,8 @@ class Host(LogicMonitor):
 
                 hgresp = json.loads(self.rpc("getHostGroup", h))
 
-                if (hgresp["status"] == 200
-                   and hgresp["data"]["appliesTo"] == ""):
+                if (hgresp["status"] == 200 and
+                   hgresp["data"]["appliesTo"] == ""):
 
                     g.append(path[-1])
 
@@ -1918,8 +1918,8 @@ class Host(LogicMonitor):
         logging.debug("Creating list of properties")
         for prop in propresp:
             if prop["name"] not in ignore:
-                if ("*******" in prop["value"]
-                   and self._verify_property(prop["name"])):
+                if ("*******" in prop["value"] and
+                   self._verify_property(prop["name"])):
                     p[prop["name"]] = self.properties[prop["name"]]
                 else:
                     p[prop["name"]] = prop["value"]
@@ -2192,8 +2192,8 @@ class Hostgroup(LogicMonitor):
 
         if properties is not None and group is not None:
             logging.debug("Comparing simple group properties")
-            if (group["alertEnable"] != self.alertenable
-               or group["description"] != self.description):
+            if (group["alertEnable"] != self.alertenable or
+               group["description"] != self.description):
 
                 return True
 
@@ -2202,8 +2202,8 @@ class Hostgroup(LogicMonitor):
             logging.debug("Creating list of properties")
             for prop in properties:
                 if prop["name"] not in ignore:
-                    if ("*******" in prop["value"]
-                       and self._verify_property(prop["name"])):
+                    if ("*******" in prop["value"] and
+                       self._verify_property(prop["name"])):
 
                         p[prop["name"]] = (
                             self.properties[prop["name"]])
