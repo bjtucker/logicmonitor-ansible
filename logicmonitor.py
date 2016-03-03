@@ -55,7 +55,6 @@ description:
         LogicMonitor account.
 version_added: "2.1"
 author: Ethan Culler-Mayeno, Jeff Wozniak
-notes: You must have an existing LogicMonitor account
 requirements:
     - An existing LogicMonitor account
     - Currently supported operating systems:
@@ -105,7 +104,6 @@ options:
                 use "superheroes"
         required: true
         default: null
-        choices: null
         version_added: "2.1"
     user:
         description:
@@ -114,14 +112,12 @@ options:
                 perform actions on behalf of this user
         required: true
         default: null
-        choices: null
         version_added: "2.1"
     password:
         description:
             - The password of the specified LogicMonitor user
         required: true
         default: null
-        choices: null
         version_added: "2.1"
     collector:
         description:
@@ -137,7 +133,6 @@ options:
                 (target=host action=update action=remove action=sdt)
         required: false
         default: null
-        choices: null
         version_added: "2.1"
     hostname:
         description:
@@ -147,7 +142,6 @@ options:
             - Optional for managing hosts (target=host)
         required: false
         default: 'hostname -f'
-        choices: null
         version_added: "2.1"
     displayname:
         description:
@@ -157,7 +151,6 @@ options:
             - Optional for managing hosts (target=host)
         required: false
         default: 'hostname -f'
-        choices: null
         version_added: "2.1"
     description:
         description:
@@ -169,7 +162,6 @@ options:
                 (target=host or target=hostgroup; action=add or action=update)
         required: false
         default: ""
-        choices: null
         version_added: "2.1"
     properties:
         description:
@@ -184,7 +176,6 @@ options:
                 LogicMonitor account or
         required: false
         default: {}
-        choices: null
         version_added: "2.1"
     groups:
         description:
@@ -194,7 +185,6 @@ options:
                 (target=host; action=add or action=update)
         required: false
         default: []
-        choices: null
         version_added: "2.1"
     id:
         description:
@@ -204,7 +194,6 @@ options:
                 (target=datasource)
         required: false
         default: null
-        choices: null
         version_added: "2.1"
     fullpath:
         description:
@@ -215,7 +204,6 @@ options:
                 (target=hostgroup)
         required: false
         default: null
-        choices: null
         version_added: "2.1"
     alertenable:
         description:
@@ -232,7 +220,6 @@ options:
             - Y-m-d H:M
         required: false
         default: Now
-        choices: null
         version_added: "2.1"
     duration:
         description:
@@ -240,7 +227,6 @@ options:
             - Optional for putting an object into SDT (action=sdt)
         required: false
         default: 30
-        choices: null
         version_added: "2.1"
 ...
 '''
