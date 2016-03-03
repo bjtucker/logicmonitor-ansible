@@ -55,10 +55,7 @@ description:
         LogicMonitor account.
 version_added: "2.1"
 author: Ethan Culler-Mayeno, Jeff Wozniak
-requirements:
-    - An existing LogicMonitor account
-    - Currently supported operating systems:
-        Linux
+requirements: ["An existing LogicMonitor account", "Linux"]
 options:
     target:
         description:
