@@ -58,7 +58,7 @@ author: Ethan Culler-Mayeno, Jeff Wozniak
 requirements:
     - An existing LogicMonitor account
     - Currently supported operating systems:
-        - Linux
+        Linux
 options:
     target:
         description:
