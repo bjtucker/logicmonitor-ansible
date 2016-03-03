@@ -55,8 +55,7 @@ description:
         LogicMonitor account.
 version_added: "2.1"
 author: Ethan Culler-Mayeno, Jeff Wozniak
-notes: >
-    You must have an existing LogicMonitor account for this module to function.
+notes: You must have an existing LogicMonitor account
 requirements:
     - An existing LogicMonitor account
     - Currently supported operating systems:
