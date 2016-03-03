@@ -15,3 +15,4 @@ setup(name='logicmonitor_ansible',
       packages=['logicmonitor_ansible'],
       install_requires=[],
       zip_safe=False)
+ 
