@@ -18,6 +18,7 @@
    Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA"""
 
 try:
+    import datetime
     import json
     import logging
     import os
@@ -27,7 +28,6 @@ try:
     import sys
     import urllib
     import urllib2
-    from datetime import datetime, timedelta
     from subprocess import Popen
     HAS_LIB = True
 except:
@@ -1296,11 +1296,11 @@ class Collector(LogicMonitor):
 
         if starttime:
             logging.debug("Start time specified")
-            start = datetime.strptime(starttime, '%Y-%m-%d %H:%M')
+            start = datetime.datetime.strptime(starttime, '%Y-%m-%d %H:%M')
             offsetstart = start
         else:
             logging.debug("No start time specified. Using default.")
-            start = datetime.utcnow()
+            start = datetime.datetime.utcnow()
 
             # Use user UTC offset
             logging.debug("Making RPC call to 'getTimeZoneSetting'")
@@ -1310,11 +1310,11 @@ class Collector(LogicMonitor):
                 logging.debug("RPC call succeeded")
 
                 offset = accountresp["data"]["offset"]
-                offsetstart = start + timedelta(0, offset)
+                offsetstart = start + datetime.timedelta(0, offset)
             else:
                 self.fail(msg="Error: Unable to retrieve timezone offset")
 
-        offsetend = offsetstart + timedelta(0, int(duration)*60)
+        offsetend = offsetstart + datetime.timedelta(0, int(duration)*60)
 
         h = {"agentId": self.id,
              "type": 1,
@@ -1737,11 +1737,11 @@ class Host(LogicMonitor):
 
             if starttime:
                 logging.debug("Start time specified")
-                start = datetime.strptime(starttime, '%Y-%m-%d %H:%M')
+                start = datetime.datetime.strptime(starttime, '%Y-%m-%d %H:%M')
                 offsetstart = start
             else:
                 logging.debug("No start time specified. Using default.")
-                start = datetime.utcnow()
+                start = datetime.datetime.utcnow()
 
                 # Use user UTC offset
                 logging.debug("Making RPC call to 'getTimeZoneSetting'")
@@ -1751,12 +1751,12 @@ class Host(LogicMonitor):
                     logging.debug("RPC call succeeded")
 
                     offset = accountresp["data"]["offset"]
-                    offsetstart = start + timedelta(0, offset)
+                    offsetstart = start + datetime.timedelta(0, offset)
                 else:
                     self.fail(
                         msg="Error: Unable to retrieve timezone offset")
 
-            offsetend = offsetstart + timedelta(0, int(duration)*60)
+            offsetend = offsetstart + datetime.timedelta(0, int(duration)*60)
 
             h = {"hostId": self.info["id"],
                  "type": 1,
@@ -1973,11 +1973,11 @@ class Datasource(LogicMonitor):
 
         if starttime:
             logging.debug("Start time specified")
-            start = datetime.strptime(starttime, '%Y-%m-%d %H:%M')
+            start = datetime.datetime.strptime(starttime, '%Y-%m-%d %H:%M')
             offsetstart = start
         else:
             logging.debug("No start time specified. Using default.")
-            start = datetime.utcnow()
+            start = datetime.datetime.utcnow()
 
             # Use user UTC offset
             logging.debug("Making RPC call to 'getTimeZoneSetting'")
@@ -1987,11 +1987,11 @@ class Datasource(LogicMonitor):
                 logging.debug("RPC call succeeded")
 
                 offset = accountresp["data"]["offset"]
-                offsetstart = start + timedelta(0, offset)
+                offsetstart = start + datetime.timedelta(0, offset)
             else:
                 self.fail(msg="Error: Unable to retrieve timezone offset")
 
-        offsetend = offsetstart + timedelta(0, int(duration)*60)
+        offsetend = offsetstart + datetime.timedelta(0, int(duration)*60)
 
         h = {"hostDataSourceId": self.id,
              "type": 1,
@@ -2234,11 +2234,11 @@ class Hostgroup(LogicMonitor):
 
         if starttime:
             logging.debug("Start time specified")
-            start = datetime.strptime(starttime, '%Y-%m-%d %H:%M')
+            start = datetime.datetime.strptime(starttime, '%Y-%m-%d %H:%M')
             offsetstart = start
         else:
             logging.debug("No start time specified. Using default.")
-            start = datetime.utcnow()
+            start = datetime.datetime.utcnow()
 
             # Use user UTC offset
             logging.debug("Making RPC call to 'getTimeZoneSetting'")
@@ -2248,12 +2248,12 @@ class Hostgroup(LogicMonitor):
                 logging.debug("RPC call succeeded")
 
                 offset = accountresp["data"]["offset"]
-                offsetstart = start + timedelta(0, offset)
+                offsetstart = start + datetime.timedelta(0, offset)
             else:
                 self.fail(
                     msg="Error: Unable to retrieve timezone offset")
 
-        offsetend = offsetstart + timedelta(0, int(duration)*60)
+        offsetend = offsetstart + datetime.timedelta(0, int(duration)*60)
 
         h = {"hostGroupId": self.info["id"],
              "type": 1,
